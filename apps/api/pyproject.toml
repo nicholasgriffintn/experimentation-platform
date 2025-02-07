@@ -1,0 +1,8 @@
+[project]
+name = "@experimentation-platform/api"
+version = "0.1.0"
+description = "API for the experimentation platform"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+]

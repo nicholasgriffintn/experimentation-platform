@@ -1,0 +1,9 @@
+{
+  "name": "@experimentation-platform/frontend",
+  "version": "1.0.0",
+  "author": "Nicholas Griffin",
+  "license": "GPLv3",
+  "description": "A free, open source experimentation platform.",
+  "scripts": {},
+  "dependencies": {}
+}
