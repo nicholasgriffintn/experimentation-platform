@@ -136,7 +136,7 @@
 
 					<div class="grid gap-2">
 						<Label for="type">Type</Label>
-						<Select bind:value={formData.type}>
+						<Select onSelectedChange={(value) => formData.type = value}>
 							<SelectTrigger>
 								<SelectValue placeholder="Select experiment type" />
 							</SelectTrigger>
@@ -186,7 +186,7 @@
 			</form>
 		</CardContent>
 		<CardFooter class="flex justify-between">
-			<Button variant="outline" asChild>
+			<Button variant="outline">
 				<a href="/experiments">Cancel</a>
 			</Button>
 			<Button type="submit" on:click={handleSubmit}>Create Experiment</Button>

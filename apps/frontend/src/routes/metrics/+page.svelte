@@ -8,7 +8,6 @@
 	import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "$lib/components/ui/table";
 	import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "$lib/components/ui/card";
 	import * as Dialog from "$lib/components/ui/dialog";
-	import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "$lib/components/ui/select";
 	import { Plus } from 'lucide-svelte';
 
 	export let data: PageData;

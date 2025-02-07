@@ -10,12 +10,12 @@
 
 	export let data: PageData;
 
-	function getStatusVariant(status: string): "default" | "destructive" | "outline" | "secondary" | "success" {
+	function getStatusVariant(status: string): "default" | "destructive" | "outline" | "secondary" {
 		switch (status.toLowerCase()) {
 			case 'draft':
 				return 'outline';
 			case 'running':
-				return 'success';
+				return 'default';
 			case 'paused':
 				return 'secondary';
 			case 'completed':
@@ -31,7 +31,7 @@
 <div class="container mx-auto p-8 space-y-8">
 	<div class="flex justify-between items-center">
 		<h2 class="scroll-m-20 text-3xl font-semibold tracking-tight first:mt-0">Experiments</h2>
-		<Button variant="default" asChild>
+		<Button variant="default">
 			<a href="/experiments/new" class="flex items-center gap-2">
 				<Plus class="h-4 w-4" />
 				<span>New Experiment</span>
@@ -48,7 +48,7 @@
 							<Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
 							<Input type="search" placeholder="Search experiments..." class="pl-8" />
 						</div>
-						<Select>
+						<Select onSelectedChange={(value) => console.log(value)}>
 							<SelectTrigger class="w-[180px]">
 								<SelectValue placeholder="All Types" />
 							</SelectTrigger>
@@ -102,7 +102,7 @@
 		<Card>
 			<CardContent class="flex flex-col items-center justify-center min-h-[200px] text-center space-y-4">
 				<p class="text-muted-foreground">No experiments found.</p>
-				<Button variant="outline" asChild>
+				<Button variant="outline">
 					<a href="/experiments/new" class="flex items-center gap-2">
 						<Plus class="h-4 w-4" />
 						<span>Create your first experiment</span>

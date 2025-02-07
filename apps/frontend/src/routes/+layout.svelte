@@ -15,13 +15,13 @@
 				</a>
 			</div>
 			<nav class="flex items-center space-x-4 lg:space-x-6">
-				<Button variant="ghost" asChild>
+				<Button variant="ghost">
 					<a href="/" class="flex items-center space-x-2">
 						<FlaskConical class="h-4 w-4" />
 						<span>Experiments</span>
 					</a>
 				</Button>
-				<Button variant="ghost" asChild>
+				<Button variant="ghost">
 					<a href="/metrics" class="flex items-center space-x-2">
 						<LineChart class="h-4 w-4" />
 						<span>Metrics</span>

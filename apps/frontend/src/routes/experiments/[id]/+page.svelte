@@ -12,12 +12,12 @@
 
 	$: experiment = data.experiment;
 
-	function getStatusVariant(status: string): "default" | "destructive" | "outline" | "secondary" | "success" {
+	function getStatusVariant(status: string): "default" | "destructive" | "outline" | "secondary" {
 		switch (status.toLowerCase()) {
 			case 'draft':
 				return 'outline';
 			case 'running':
-				return 'success';
+				return 'default';
 			case 'paused':
 				return 'secondary';
 			case 'completed':
@@ -56,7 +56,7 @@
 		</div>
 		<div class="flex gap-2">
 			{#if experiment.status === 'draft'}
-				<Button variant="success" on:click={() => handleStatusChange('running')}>
+				<Button variant="default" on:click={() => handleStatusChange('running')}>
 					<Play class="mr-2 h-4 w-4" />
 					Start Experiment
 				</Button>
@@ -70,7 +70,7 @@
 					Complete
 				</Button>
 			{:else if experiment.status === 'paused'}
-				<Button variant="success" on:click={() => handleStatusChange('running')}>
+				<Button variant="default" on:click={() => handleStatusChange('running')}>
 					<Play class="mr-2 h-4 w-4" />
 					Resume
 				</Button>
