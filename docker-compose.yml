@@ -7,6 +7,8 @@ services:
       experimentation_net:
         aliases:
           - experimentation.db
+    ports:
+      - "5432:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -112,9 +114,49 @@ services:
       - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
       - CATALOG_S3_ENDPOINT=http://warehouse:9000
 
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    networks:
+      experimentation_net:
+        aliases:
+          - experimentation.api
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@localhost:5432/experiments
+      - DEBUG_MODE=true
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - warehouse
+    volumes:
+      - ./apps/api:/app
+      - api_node_modules:/app/node_modules
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    networks:
+      experimentation_net:
+        aliases:
+          - experimentation.frontend
+    environment:
+      - API_URL=http://experimentation.api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    volumes:
+      - ./apps/frontend:/app/apps/frontend
+      - frontend_node_modules:/app/apps/frontend/node_modules
+
 volumes:
   postgres_data:
   warehouse_data:
+  api_node_modules:
+  frontend_node_modules:
 
 networks:
   experimentation_net:
