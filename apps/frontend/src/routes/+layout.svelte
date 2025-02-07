@@ -2,7 +2,7 @@
 <script lang="ts">
 	import '../app.postcss';
 	import { Button } from "$lib/components/ui/button";
-	import { Home, FlaskConical, LineChart } from 'lucide-svelte';
+	import { FlaskConical, LineChart } from 'lucide-svelte';
 </script>
 
 <div class="min-h-screen flex flex-col">
@@ -17,12 +17,6 @@
 			<nav class="flex items-center space-x-4 lg:space-x-6">
 				<Button variant="ghost" asChild>
 					<a href="/" class="flex items-center space-x-2">
-						<Home class="h-4 w-4" />
-						<span>Home</span>
-					</a>
-				</Button>
-				<Button variant="ghost" asChild>
-					<a href="/experiments" class="flex items-center space-x-2">
 						<FlaskConical class="h-4 w-4" />
 						<span>Experiments</span>
 					</a>
