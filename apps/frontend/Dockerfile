@@ -17,9 +17,5 @@ RUN pnpm install --no-frozen-lockfile
 # Copy frontend code
 COPY apps/frontend /app/apps/frontend
 
-# Generate SvelteKit types
-WORKDIR /app/apps/frontend
-RUN pnpm svelte-kit sync
-
 # Start development server
 CMD ["pnpm", "dev", "--host"] 
