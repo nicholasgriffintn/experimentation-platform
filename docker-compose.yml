@@ -76,7 +76,9 @@ services:
   iceberg_spark:
     image: tabulario/spark-iceberg
     container_name: spark-iceberg
-    build: apps/analysis
+    build: 
+      context: ./apps/analysis
+      dockerfile: Dockerfile
     networks:
       experimentation_net:
         aliases:
@@ -87,6 +89,7 @@ services:
     volumes:
       - ./apps/analysis/warehouse:/home/iceberg/warehouse
       - ./apps/analysis/notebooks:/home/iceberg/notebooks/notebooks
+      - ./apps/analysis/src:/app/src
     environment:
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=password
@@ -96,6 +99,8 @@ services:
       - 8080:8080
       - 10000:10000
       - 10001:10001
+      - 8001:8001
+    command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8001"]
 
   iceberg_rest:
     image: tabulario/iceberg-rest
