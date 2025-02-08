@@ -15,24 +15,25 @@ services:
       - POSTGRES_DB=experiments
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   cache:
-    image: valkey/valkey:alpine3.21
+    image: valkey/valkey:alpine
     ports:
       - "6379:6379"
-
-  visualisation:
-    image: apache/superset
     networks:
       experimentation_net:
         aliases:
-          - experimentation.visualisation
-    ports:
-      - "8088:8088"
-    environment:
-      - SUPERSET_SECRET_KEY=supersecret
-    depends_on:
-      - db
+          - experimentation.cache
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   warehouse:
     image: minio/minio
@@ -50,71 +51,113 @@ services:
     command: ["server", "/data", "--console-address", ":9001"]
     volumes:
       - warehouse_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
-  warehouse_client:
-    depends_on:
-      - warehouse
+  warehouse-init:
     image: minio/mc
-    container_name: mc
+    depends_on:
+      warehouse:
+        condition: service_healthy
     networks:
-      experimentation_net:
-        aliases:
-          - experimentation.warehouse_client
+      - experimentation_net
     environment:
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=password
       - AWS_REGION=us-east-1
     entrypoint: >
       /bin/sh -c "
-      until (/usr/bin/mc config host add minio http://warehouse:9000 admin password) do echo '...waiting...' && sleep 1; done;
-      /usr/bin/mc rm -r --force minio/iceberg;
-      /usr/bin/mc mb minio/iceberg;
-      /usr/bin/mc policy set public minio/iceberg;
-      tail -f /dev/null
+      mc config host add minio http://warehouse:9000 admin password;
+      mc mb --ignore-existing minio/warehouse;
+      mc mb --ignore-existing minio/warehouse/iceberg;
+      mc anonymous set public minio/warehouse;
+      exit 0;
       "
-  
-  spark-iceberg:
-    image: tabulario/spark-iceberg
-    container_name: spark-iceberg
-    restart: always
-    build: apps/analysis/spark/
-    depends_on:
-      - rest-iceberg
-      - warehouse
-    volumes:
-      - ./apps/analysis/warehouse:/home/iceberg/iceberg_warehouse
-      - ./apps/analysis/notebooks:/home/iceberg/notebooks/notebooks
-      - ./apps/analysis/spark/data:/home/iceberg/data
+
+  hive-metastore:
+    image: apache/hive:4.0.0-alpha-2
+    networks:
+      experimentation_net:
+        aliases:
+          - experimentation.hive
     environment:
+      - SERVICE_NAME=metastore
+      - DB_DRIVER=postgres
+      - DB_CONNECTION_URL=jdbc:postgresql://experimentation.db:5432/hive
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+    ports:
+      - "9083:9083"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  spark-master:
+    image: bitnami/spark:latest
+    networks:
+      experimentation_net:
+        aliases:
+          - experimentation.spark
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=password
       - AWS_REGION=us-east-1
     ports:
-      - 8888:8888
-      - 8080:8080
-      - 10000:10000
-      - 10001:10001
+      - "8080:8080"
+      - "7077:7077"
+    volumes:
+      - ./apps/analysis/spark/conf:/opt/bitnami/spark/conf
+      - ./apps/analysis/spark/jars:/opt/bitnami/spark/jars
+
+  spark-worker:
+    image: bitnami/spark:latest
     networks:
-      experimentation_net:
-        aliases:
-          - experimentation.spark-iceberg
+      - experimentation_net
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://experimentation.spark:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=password
+      - AWS_REGION=us-east-1
+    volumes:
+      - ./apps/analysis/spark/conf:/opt/bitnami/spark/conf
+      - ./apps/analysis/spark/jars:/opt/bitnami/spark/jars
+    depends_on:
+      - spark-master
 
   rest-iceberg:
-    image: tabulario/iceberg-rest
-    container_name: iceberg-rest
+    image: tabulario/iceberg-rest:latest
     networks:
       experimentation_net:
         aliases:
-          - experimentation.iceberg_rest
+          - experimentation.iceberg
     ports:
-      - 8181:8181
+      - "8181:8181"
     environment:
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=password
       - AWS_REGION=us-east-1
-      - CATALOG_WAREHOUSE=s3://iceberg/
+      - CATALOG_WAREHOUSE=s3://warehouse/iceberg/
       - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
       - CATALOG_S3_ENDPOINT=http://warehouse:9000
+      - CATALOG_S3_PATH_STYLE_ACCESS=true
+    depends_on:
+      - warehouse
+      - hive-metastore
 
   api:
     build:
@@ -125,16 +168,27 @@ services:
         aliases:
           - experimentation.api
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@localhost:5432/experiments
+      - DATABASE_URL=postgresql://postgres:postgres@experimentation.db:5432/experiments
+      - REDIS_URL=redis://experimentation.cache:6379/0
+      - WAREHOUSE_ENDPOINT=http://experimentation.warehouse:9000
+      - WAREHOUSE_ACCESS_KEY=admin
+      - WAREHOUSE_SECRET_KEY=password
+      - WAREHOUSE_REGION=us-east-1
+      - ICEBERG_REST_URL=http://experimentation.iceberg:8181
       - DEBUG_MODE=true
     ports:
       - "8000:8000"
-    depends_on:
-      - db
-      - warehouse
     volumes:
       - ./apps/api:/app
-      - api_node_modules:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      warehouse:
+        condition: service_healthy
+      rest-iceberg:
+        condition: service_started
 
   frontend:
     build:
@@ -148,17 +202,15 @@ services:
       - API_URL=http://experimentation.api:8000
     ports:
       - "3000:3000"
+    volumes:
+      - ./apps/frontend:/app
     depends_on:
       - api
-    volumes:
-      - ./apps/frontend:/app/apps/frontend
-      - frontend_node_modules:/app/apps/frontend/node_modules
 
 volumes:
   postgres_data:
   warehouse_data:
-  api_node_modules:
-  frontend_node_modules:
 
 networks:
   experimentation_net:
+    driver: bridge

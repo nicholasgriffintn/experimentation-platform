@@ -7,7 +7,7 @@ This is the API service for the experimentation platform. It provides endpoints 
 1. Start the infrastructure services from the root directory:
 ```bash
 cd ../..  # Go to root directory
-docker-compose up -d
+./scripts/run.sh
 ```
 
 2. Create a virtual environment:
