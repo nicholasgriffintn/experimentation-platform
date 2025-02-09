@@ -76,7 +76,8 @@ async def startup_event():
     else:
         print("Scheduler is disabled")
 
-    seed_all(db)
+    db = next(get_db())
+    await seed_all(db)
 
 @app.on_event("shutdown")
 async def shutdown_event():

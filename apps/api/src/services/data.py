@@ -63,13 +63,47 @@ class IcebergDataService:
     def create_table(self, table_name: str, schema: Schema, partition_spec: PartitionSpec):
         """Create a new Iceberg table"""
         try:
+            try:
+                existing_table = self.catalog.load_table(table_name)
+                print(f"Table {table_name} already exists")
+                return
+            except Exception:
+                pass
+            
+            namespace, table = table_name.split('.')
+            
             self.catalog.create_table(
-                table_name,
-                schema,
-                partition_spec
+                identifier=(namespace, table),
+                schema=schema,
+                partition_spec=partition_spec,
+                properties={
+                    "write.format.default": "parquet",
+                    "write.parquet.compression-codec": "snappy",
+                    "format-version": "2",
+                    "write.metadata.compression-codec": "gzip",
+                    "write.metadata.metrics.default": "full",
+                    "write.metadata.metrics.column.default": "full",
+                    "write.object-storage.enabled": "true",
+                    "write.delete.mode": "merge-on-read",
+                    "write.update.mode": "merge-on-read",
+                    "write.merge.mode": "merge-on-read",
+                    "write.distribution-mode": "hash",
+                    "write.target-file-size-bytes": "536870912",  # 512MB
+                    "read.split.target-size": "134217728",  # 128MB
+                    "read.split.planning-lookback": "10",
+                    "read.split.open-file-cost": "4194304",  # 4MB
+                }
             )
+            print(f"Successfully created table {table_name}")
         except Exception as e:
-            raise Exception(f"Failed to create table {table_name}: {str(e)}")
+            error_msg = str(e)
+            print(f"Failed to create table {table_name}: {error_msg}")
+            if "NoSuchNamespaceException" in error_msg:
+                print(f"Namespace does not exist for table {table_name}")
+            elif "TableAlreadyExistsException" in error_msg:
+                print(f"Table {table_name} already exists (concurrent creation)")
+            else:
+                raise Exception(f"Failed to create table {table_name}: {error_msg}")
 
     async def get_experiment_config(self, experiment_id: str) -> Dict:
         """Get experiment configuration from database"""
