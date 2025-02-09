@@ -280,6 +280,27 @@ class ExperimentService:
             }
         )
 
+    async def stop_experiment(
+        self,
+        experiment_id: str,
+        reason: Optional[str] = None
+    ) -> None:
+        """Stop an experiment"""
+        await self.data_service.record_event(
+            experiment_id=experiment_id,
+            event_data={
+                'event_type': 'stop',
+                'reason': reason
+            }
+        )
+        
+        if self.cache_service:
+            config = await self.cache_service.get_experiment_config(experiment_id)
+            if config:
+                config['status'] = 'stopped'
+                config['stopped_reason'] = reason
+                await self.cache_service.set_experiment_config(experiment_id, config)
+
     async def update_schedule(
         self,
         experiment_id: str,
