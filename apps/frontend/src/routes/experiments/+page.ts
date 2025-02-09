@@ -1,16 +1,15 @@
 import type { PageLoad } from './$types';
-import { error } from '@sveltejs/kit';
-import { config } from '$lib/config';
+import { get } from 'svelte/store';
+import { experiments, experimentActions } from '$lib/stores/experiments';
 
-export const load: PageLoad = async ({ fetch }) => {
-	try {
-		const response = await fetch(config.api.experiments);
-		if (!response.ok) throw new Error('Failed to fetch experiments');
-		const experiments = await response.json();
-		return { experiments };
-	} catch (e) {
-		throw error(500, {
-			message: 'Error loading experiments'
-		});
-	}
+export const load: PageLoad = async () => {
+    const currentExperiments = get(experiments);
+    
+    if (!currentExperiments.length) {
+        await experimentActions.loadExperiments();
+    }
+
+    return {
+        experiments: get(experiments) || []
+    };
 }; 

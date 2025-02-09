@@ -1,21 +1,24 @@
 import type { PageLoad } from './$types';
 import { error } from '@sveltejs/kit';
-import { config } from '$lib/config';
+import { get } from 'svelte/store';
+import { experiments, experimentActions } from '$lib/stores/experiments';
 
-export const load: PageLoad = async ({ fetch, params }) => {
-	try {
-		const [experimentResponse] = await Promise.all([
-			fetch(`${config.api.experiments}/${params.id}`),
-		]);
+export const load: PageLoad = async ({ params }) => {
+    try {
+        const experiment = await experimentActions.loadExperiment(params.id);
+        
+        if (!experiment) {
+            throw error(404, 'Experiment not found');
+        }
 
-		if (!experimentResponse.ok) throw new Error('Failed to fetch experiment');
+        await experimentActions.loadExperimentResults(experiment.id);
 
-		const experiment = await experimentResponse.json();
-
-		return { experiment };
-	} catch (e) {
-		throw error(500, {
-			message: 'Error loading experiment details'
-		});
-	}
+        return {
+            experiment,
+            experiments: get(experiments) || []
+        };
+    } catch (e) {
+        console.error('Failed to load experiment:', e);
+        throw error(404, 'Experiment not found');
+    }
 }; 

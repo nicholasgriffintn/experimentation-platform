@@ -53,6 +53,15 @@ class ExperimentService:
         self.stats_service = stats_service
         self.cache_service = cache_service
 
+    async def _get_experiment_config(self, experiment_id: str) -> Dict:
+        """Get experiment configuration from cache or database"""
+        if self.cache_service:
+            config = await self.cache_service.get_experiment_config(experiment_id)
+            if config:
+                return config
+        
+        return await self.data_service.get_experiment_config(experiment_id)
+
     async def initialize_experiment(
         self,
         experiment_id: str,
@@ -141,15 +150,21 @@ class ExperimentService:
         config = await self._get_experiment_config(experiment_id)
         metrics_to_analyze = metrics or [m.name for m in config['metrics']]
         
-        results = {}
+        metrics_results = {}
+        total_users = 0
+        
         for metric_name in metrics_to_analyze:
             metric_data = await self._get_metric_data(experiment_id, metric_name)
+            metrics_results[metric_name] = {}
             
             control_data = metric_data.get('control', [])
+            total_users = max(total_users, len(control_data))
+            
             for variant_id, variant_data in metric_data.items():
                 if variant_id == 'control':
                     continue
                     
+                total_users = max(total_users, len(variant_data))
                 analysis_result = await self.stats_service.analyze_experiment(
                     control_data=control_data,
                     variant_data=variant_data,
@@ -157,7 +172,17 @@ class ExperimentService:
                     metric_name=metric_name
                 )
                 
-                results[f"{metric_name}_{variant_id}"] = analysis_result
+                metrics_results[metric_name][variant_id] = analysis_result
+
+        results = {
+            "experiment_id": experiment_id,
+            "status": config.get('status', 'running'),
+            "start_time": config.get('start_time', datetime.utcnow()),
+            "end_time": config.get('end_time'),
+            "total_users": total_users,
+            "metrics": metrics_results,
+            "guardrail_violations": None  # TODO: Implement guardrail checks
+        }
 
         await self.data_service.record_results(
             experiment_id=experiment_id,

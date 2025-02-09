@@ -1,114 +1,104 @@
 <script lang="ts">
-	import type { PageData } from './$types';
-	import { Button } from "$lib/components/ui/button";
-	import { Input } from "$lib/components/ui/input";
-	import { Badge } from "$lib/components/ui/badge";
-	import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
-	import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "$lib/components/ui/table";
-	import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "$lib/components/ui/select";
-	import { Search, Plus } from 'lucide-svelte';
+	import { onMount } from 'svelte';
+	import { experiments, activeExperiments, completedExperiments } from '$lib/stores/experiments';
+	import { metrics } from '$lib/stores/metrics';
+	import { experimentActions } from '$lib/stores/experiments';
+	import { metricActions } from '$lib/stores/metrics';
 
-	export let data: PageData;
-
-	function getStatusVariant(status: string): "default" | "destructive" | "outline" | "secondary" {
-		switch (status.toLowerCase()) {
-			case 'draft':
-				return 'outline';
-			case 'running':
-				return 'default';
-			case 'paused':
-				return 'secondary';
-			case 'completed':
-				return 'default';
-			case 'stopped':
-				return 'destructive';
-			default:
-				return 'outline';
-		}
-	}
+	onMount(() => {
+		experimentActions.loadExperiments();
+		metricActions.loadMetrics();
+	});
 </script>
 
-<div class="container mx-auto p-8 space-y-8">
-	<div class="flex justify-between items-center">
-		<h2 class="scroll-m-20 text-3xl font-semibold tracking-tight first:mt-0">Experiments</h2>
-		<Button variant="default">
-			<a href="/experiments/new" class="flex items-center gap-2">
-				<Plus class="h-4 w-4" />
-				<span>New Experiment</span>
-			</a>
-		</Button>
+<div class="container mx-auto px-4 py-8">
+	<h1 class="text-3xl font-bold mb-8">Dashboard</h1>
+
+	<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+		<div class="bg-white p-6 rounded-lg shadow">
+			<h3 class="text-lg font-medium text-gray-900">Total Experiments</h3>
+			<p class="mt-2 text-3xl font-semibold">{$experiments.length}</p>
+		</div>
+		<div class="bg-white p-6 rounded-lg shadow">
+			<h3 class="text-lg font-medium text-gray-900">Active Experiments</h3>
+			<p class="mt-2 text-3xl font-semibold text-green-600">{$activeExperiments.length}</p>
+		</div>
+		<div class="bg-white p-6 rounded-lg shadow">
+			<h3 class="text-lg font-medium text-gray-900">Completed Experiments</h3>
+			<p class="mt-2 text-3xl font-semibold text-green-600">{$completedExperiments.length}</p>
+		</div>
+		<div class="bg-white p-6 rounded-lg shadow">
+			<h3 class="text-lg font-medium text-gray-900">Available Metrics</h3>
+			<p class="mt-2 text-3xl font-semibold text-blue-600">{$metrics.length}</p>
+		</div>
 	</div>
 
-	{#if data.experiments && data.experiments.length > 0}
-		<Card>
-			<CardHeader>
-				<div class="flex justify-between items-center gap-4">
-					<div class="flex-1 flex gap-4">
-						<div class="relative flex-1">
-							<Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-							<Input type="search" placeholder="Search experiments..." class="pl-8" />
+	<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+		<div class="bg-white p-6 rounded-lg shadow">
+			<div class="flex justify-between items-center mb-4">
+				<h2 class="text-xl font-semibold">Recent Experiments</h2>
+				<a 
+					href="/experiments" 
+					class="text-sm text-blue-600 hover:text-blue-800"
+				>
+					View all →
+				</a>
+			</div>
+			{#if $experiments.length === 0}
+				<p class="text-gray-500">No experiments yet</p>
+			{:else}
+				<div class="space-y-4">
+					{#each $experiments.slice(0, 5) as experiment}
+						<div class="border-b pb-4 last:border-b-0">
+							<div class="flex justify-between items-start">
+								<div>
+									<h3 class="font-medium">{experiment.name}</h3>
+									<p class="text-sm text-gray-600">{experiment.description}</p>
+								</div>
+								<span class="px-2 py-1 text-sm rounded-full
+									{experiment.status === 'running' ? 'bg-green-100 text-green-800' :
+									experiment.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+									experiment.status === 'stopped' ? 'bg-red-100 text-red-800' :
+									'bg-gray-100 text-gray-800'}">
+									{experiment.status}
+								</span>
+							</div>
 						</div>
-						<Select onSelectedChange={(value) => console.log(value)}>
-							<SelectTrigger class="w-[180px]">
-								<SelectValue placeholder="All Types" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="all">All Types</SelectItem>
-								<SelectItem value="ab_test">A/B Test</SelectItem>
-								<SelectItem value="multivariate">Multivariate</SelectItem>
-								<SelectItem value="feature_flag">Feature Flag</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
+					{/each}
 				</div>
-			</CardHeader>
-			<CardContent>
-				<div class="rounded-md border">
-					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead>Name</TableHead>
-								<TableHead>Type</TableHead>
-								<TableHead>Status</TableHead>
-								<TableHead>Created</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{#each data.experiments as experiment}
-								<TableRow>
-									<TableCell>
-										<a
-											href="/experiments/{experiment.id}"
-											class="hover:underline text-foreground font-medium"
-										>
-											{experiment.name}
-										</a>
-									</TableCell>
-									<TableCell class="capitalize">{experiment.type}</TableCell>
-									<TableCell>
-										<Badge variant={getStatusVariant(experiment.status)}>
-											{experiment.status}
-										</Badge>
-									</TableCell>
-									<TableCell>{new Date(experiment.created_at).toLocaleDateString()}</TableCell>
-								</TableRow>
-							{/each}
-						</TableBody>
-					</Table>
+			{/if}
+		</div>
+
+		<div class="bg-white p-6 rounded-lg shadow">
+			<div class="flex justify-between items-center mb-4">
+				<h2 class="text-xl font-semibold">Available Metrics</h2>
+				<a 
+					href="/metrics" 
+					class="text-sm text-blue-600 hover:text-blue-800"
+				>
+					Manage metrics →
+				</a>
+			</div>
+			{#if $metrics.length === 0}
+				<p class="text-gray-500">No metrics defined yet</p>
+			{:else}
+				<div class="space-y-4">
+					{#each $metrics.slice(0, 5) as metric}
+						<div class="border-b pb-4 last:border-b-0">
+							<h3 class="font-medium">{metric.name}</h3>
+							<p class="text-sm text-gray-600">{metric.description}</p>
+							<div class="mt-1 flex space-x-2">
+								<span class="text-xs px-2 py-1 bg-gray-100 rounded-full">
+									{metric.unit}
+								</span>
+								<span class="text-xs px-2 py-1 bg-gray-100 rounded-full">
+									{metric.aggregation_method}
+								</span>
+							</div>
+						</div>
+					{/each}
 				</div>
-			</CardContent>
-		</Card>
-	{:else}
-		<Card>
-			<CardContent class="flex flex-col items-center justify-center min-h-[200px] text-center space-y-4">
-				<p class="text-muted-foreground">No experiments found.</p>
-				<Button variant="outline">
-					<a href="/experiments/new" class="flex items-center gap-2">
-						<Plus class="h-4 w-4" />
-						<span>Create your first experiment</span>
-					</a>
-				</Button>
-			</CardContent>
-		</Card>
-	{/if}
+			{/if}
+		</div>
+	</div>
 </div>

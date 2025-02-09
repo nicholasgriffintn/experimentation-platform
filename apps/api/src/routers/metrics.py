@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
 from typing import List
-from pydantic import BaseModel
 
 from ..db.session import get_db
 from ..db.base import MetricDefinition as DBMetricDefinition
@@ -23,6 +22,7 @@ async def create_metric(metric: MetricDefinition, db: Session = Depends(get_db))
         name=metric.name,
         description=metric.description,
         unit=metric.unit,
+        data_type=metric.data_type.value,
         aggregation_method=metric.aggregation_method,
         query_template=metric.query_template
     )

@@ -8,16 +8,19 @@ from .services.analysis import StatisticalAnalysisService
 from .services.data import IcebergDataService
 from .services.scheduler import ExperimentScheduler
 from .config.app import settings
+from .config.iceberg import IcebergConfig, create_catalog
 
 @lru_cache
 def get_iceberg_service() -> IcebergDataService:
     """Get cached IcebergDataService instance."""
-    return IcebergDataService(
+    config = IcebergConfig(
         warehouse_location=settings.warehouse_location,
-        aws_access_key=settings.aws_access_key_id,
-        aws_secret_key=settings.aws_secret_access_key,
+        aws_access_key_id=settings.aws_access_key_id,
+        aws_secret_access_key=settings.aws_secret_access_key,
         aws_region=settings.aws_region
     )
+    catalog = create_catalog(config)
+    return IcebergDataService(catalog=catalog)
 
 @lru_cache
 def get_stats_service() -> StatisticalAnalysisService:

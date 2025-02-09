@@ -16,7 +16,11 @@ class Settings(BaseSettings):
     
     # Security Settings
     secret_key: str = "CHANGE_ME"
-    cors_origins: List[str] = ["*"]
+    cors_origins: List[str] = [
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:4173",  # Vite preview
+        "http://localhost:3000",  # Alternative dev port
+    ]
     
     # AWS/Storage Settings
     warehouse_location: str = "s3://your-bucket/warehouse"

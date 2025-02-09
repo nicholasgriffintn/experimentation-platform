@@ -27,6 +27,7 @@ class Experiment(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     started_at = Column(DateTime)
     ended_at = Column(DateTime)
+    stopped_reason = Column(String, nullable=True)
     
     variants = relationship("Variant", back_populates="experiment")
     metrics = relationship("ExperimentMetric", back_populates="experiment")

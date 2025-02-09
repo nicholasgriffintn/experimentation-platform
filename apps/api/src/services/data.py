@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 import uuid
 from pyiceberg.catalog import Catalog
@@ -13,7 +13,7 @@ class IcebergDataService:
         self.catalog = catalog
         self.schemas = IcebergSchemas()
 
-    async def initialize_experiment_tables(self, experiment_id: str):
+    async def initialize_experiment_tables(self, experiment_id: str) -> None:
         """Initialize all required tables for a new experiment"""
         namespace = "experiments"
         
@@ -71,37 +71,24 @@ class IcebergDataService:
         except Exception as e:
             raise Exception(f"Failed to create table {table_name}: {str(e)}")
 
-    async def record_event(self, experiment_id: str, event_data: Dict):
-        """Record an experiment event"""
-        table = self.load_table(f"experiments.{experiment_id}_events")
-        
-        with table.new_transaction() as transaction:
-            transaction.new_append() \
-                .add_row({
-                    "event_id": str(uuid.uuid4()),
-                    "experiment_id": experiment_id,
-                    "timestamp": datetime.utcnow(),
-                    **event_data
-                }) \
-                .commit()
-            
-            transaction.commit()
+    async def get_experiment_config(self, experiment_id: str) -> Dict:
+        """Get experiment configuration from database"""
+        # TODO: Implement proper config retrieval
+        return {
+            'id': experiment_id,
+            'metrics': {},
+            'variants': []
+        }
 
-    async def record_metric(self, experiment_id: str, metric_data: Dict):
+    async def record_event(self, experiment_id: str, event_data: Dict) -> None:
+        """Record an event for the experiment"""
+        # TODO: Implement event recording
+        pass
+
+    async def record_metric(self, experiment_id: str, metric_data: Dict) -> None:
         """Record a metric measurement"""
-        table = self.load_table(f"experiments.{experiment_id}_metrics")
-        
-        with table.new_transaction() as transaction:
-            transaction.new_append() \
-                .add_row({
-                    "metric_id": str(uuid.uuid4()),
-                    "experiment_id": experiment_id,
-                    "timestamp": datetime.utcnow(),
-                    **metric_data
-                }) \
-                .commit()
-            
-            transaction.commit()
+        # TODO: Implement metric recording
+        pass
 
     async def assign_variant(self, experiment_id: str, user_id: str, variant_id: str, context: Optional[Dict] = None):
         """Record a user-variant assignment"""
@@ -121,21 +108,10 @@ class IcebergDataService:
             
             transaction.commit()
 
-    async def record_results(self, experiment_id: str, results_data: Dict):
-        """Record experiment results"""
-        table = self.load_table(f"experiments.{experiment_id}_results")
-        
-        with table.new_transaction() as transaction:
-            transaction.new_append() \
-                .add_row({
-                    "result_id": str(uuid.uuid4()),
-                    "experiment_id": experiment_id,
-                    "timestamp": datetime.utcnow(),
-                    **results_data
-                }) \
-                .commit()
-            
-            transaction.commit()
+    async def record_results(self, experiment_id: str, results_data: Dict) -> None:
+        """Record analysis results"""
+        # TODO: Implement results recording
+        pass
 
     def load_table(self, table_name: str) -> Table:
         """Load an Iceberg table"""
@@ -158,14 +134,9 @@ class IcebergDataService:
         return list(scanner.plan_scan())
 
     async def get_metric_history(self, experiment_id: str, metric_name: str) -> List[Dict]:
-        """Get historical metric values"""
-        table = self.load_table(f"experiments.{experiment_id}_metrics")
-        
-        scanner = table.new_scan() \
-            .filter(table.expr.ref("metric_name").eq(metric_name)) \
-            .select("timestamp", "metric_value", "variant_id")
-            
-        return list(scanner.plan_scan())
+        """Get metric history for an experiment"""
+        # TODO: Implement metric history retrieval
+        return []
 
     async def get_experiment_snapshot(self, experiment_id: str, timestamp: datetime) -> Dict:
         """Get a snapshot of experiment state at a specific time"""

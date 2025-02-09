@@ -1,12 +1,13 @@
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Dict
 from datetime import datetime
+from uuid import uuid4
 
 from ..db.session import get_db
 from ..services.experiments import ExperimentService
 from ..models.experiment import (
-    Experiment,
+    Experiment as ExperimentModel,
     ExperimentCreate,
     VariantAssignment,
     ExperimentResults,
@@ -14,14 +15,27 @@ from ..models.experiment import (
     MetricEvent,
     ExperimentSchedule,
     ExperimentStatus,
-    MetricDefinition,
-    ExperimentMetric
+)
+from ..db.base import (
+    Experiment as DBExperiment,
+    MetricDefinition as DBMetricDefinition,
+    ExperimentMetric as DBExperimentMetric,
+    Variant as DBVariant
 )
 from ..dependencies import get_experiment_service
 
 router = APIRouter()
 
-@router.post("/", response_model=Experiment, status_code=status.HTTP_201_CREATED)
+@router.get("/", response_model=List[ExperimentModel])
+async def list_experiments(
+    experiment_service: ExperimentService = Depends(get_experiment_service),
+    db: Session = Depends(get_db)
+):
+    """List all experiments"""
+    experiments = get_experiments_list(db)
+    return experiments
+
+@router.post("/", response_model=ExperimentModel, status_code=status.HTTP_201_CREATED)
 async def create_experiment(
     experiment: ExperimentCreate,
     background_tasks: BackgroundTasks,
@@ -29,7 +43,7 @@ async def create_experiment(
     db: Session = Depends(get_db)
 ):
     """Create a new experiment"""
-    for metric_name in experiment.target_metrics:
+    for metric_name in experiment.metrics:
         if not await validate_metric(metric_name, db):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -46,6 +60,15 @@ async def create_experiment(
     
     return db_experiment
 
+@router.get("/{experiment_id}", response_model=ExperimentModel)
+async def get_experiment(
+    experiment_id: str,
+    experiment_service: ExperimentService = Depends(get_experiment_service),
+    db: Session = Depends(get_db)
+):
+    """Get an experiment"""
+    return get_experiment(experiment_id, db)
+
 @router.post("/{experiment_id}/assign", response_model=VariantAssignment)
 async def assign_variant(
     experiment_id: str,
@@ -56,7 +79,6 @@ async def assign_variant(
     """Assign a variant to a user"""
     db_experiment = get_active_experiment(experiment_id, db)
     
-    # Get variant assignment
     variant = await experiment_service.assign_variant(
         experiment_id=experiment_id,
         user_context=user_context.dict()
@@ -170,6 +192,7 @@ async def stop_experiment(
     
     db_experiment.status = ExperimentStatus.STOPPED
     db_experiment.ended_at = datetime.utcnow()
+    db_experiment.stopped_reason = reason
     db.commit()
     
     await experiment_service.stop_experiment(
@@ -179,17 +202,35 @@ async def stop_experiment(
     
     return {"status": "success"}
 
-def get_experiment(experiment_id: str, db: Session) -> Experiment:
+def get_experiments_list(db: Session) -> List[DBExperiment]:
+    """Get all experiments"""
+    print("Executing query with experiment metrics...")
+    experiments = db.query(DBExperiment).options(
+        joinedload(DBExperiment.variants),
+        joinedload(DBExperiment.metrics),
+        joinedload(DBExperiment.guardrail_metrics)
+    ).all()
+    
+    
+    return experiments
+
+def get_experiment(experiment_id: str, db: Session) -> DBExperiment:
     """Get experiment or raise 404"""
-    experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
+    experiment = db.query(DBExperiment).options(
+        joinedload(DBExperiment.variants),
+        joinedload(DBExperiment.metrics),
+        joinedload(DBExperiment.guardrail_metrics)
+    ).filter(DBExperiment.id == experiment_id).first()
+    
     if not experiment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found"
         )
+    
     return experiment
 
-def get_active_experiment(experiment_id: str, db: Session) -> Experiment:
+def get_active_experiment(experiment_id: str, db: Session) -> DBExperiment:
     """Get running experiment or raise error"""
     experiment = get_experiment(experiment_id, db)
     if experiment.status != ExperimentStatus.RUNNING:
@@ -201,21 +242,57 @@ def get_active_experiment(experiment_id: str, db: Session) -> Experiment:
 
 async def validate_metric(metric_name: str, db: Session) -> bool:
     """Validate that a metric exists"""
-    metric = db.query(MetricDefinition).filter(MetricDefinition.name == metric_name).first()
+    metric = db.query(DBMetricDefinition).filter(DBMetricDefinition.name == metric_name).first()
     return metric is not None
 
 def is_valid_experiment_metric(experiment_id: str, metric_name: str, db: Session) -> bool:
     """Check if metric is configured for experiment"""
-    metric = db.query(ExperimentMetric).filter(
-        ExperimentMetric.experiment_id == experiment_id,
-        ExperimentMetric.metric_name == metric_name
+    metric = db.query(DBExperimentMetric).filter(
+        DBExperimentMetric.experiment_id == experiment_id,
+        DBExperimentMetric.metric_name == metric_name
     ).first()
     return metric is not None
 
-def create_experiment_in_db(experiment: ExperimentCreate, db: Session) -> Experiment:
+def create_experiment_in_db(experiment: ExperimentCreate, db: Session) -> DBExperiment:
     """Create a new experiment in the database"""
-    db_experiment = Experiment(**experiment.dict())
+    experiment_data = experiment.dict(
+        exclude={
+            'variants',
+            'metrics',
+            'guardrail_metrics',
+            'metrics',
+            'schedule'
+        }
+    )
+    
+    experiment_data['id'] = str(uuid4())
+    experiment_data['status'] = ExperimentStatus.DRAFT
+    
+    if experiment.schedule:
+        experiment_data['start_time'] = experiment.schedule.start_time
+        experiment_data['end_time'] = experiment.schedule.end_time
+    
+    db_experiment = DBExperiment(**experiment_data)
     db.add(db_experiment)
+    
+    for variant_data in experiment.variants:
+        variant = DBVariant(
+            id=variant_data.id or str(uuid4()),
+            experiment_id=db_experiment.id,
+            name=variant_data.name,
+            type=variant_data.type.value,
+            config=variant_data.config,
+            traffic_percentage=variant_data.traffic_percentage
+        )
+        db.add(variant)
+    
+    for metric_name in experiment.metrics:
+        experiment_metric = DBExperimentMetric(
+            experiment_id=db_experiment.id,
+            metric_name=metric_name
+        )
+        db.add(experiment_metric)
+    
     db.commit()
     db.refresh(db_experiment)
     return db_experiment

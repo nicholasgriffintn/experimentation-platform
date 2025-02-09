@@ -1,7 +1,8 @@
 from datetime import datetime
 from enum import Enum
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, computed_field, validator
+from pydantic import BaseModel, Field, validator, model_validator
+from uuid import uuid4
 
 
 class ExperimentStatus(str, Enum):
@@ -52,7 +53,7 @@ class MetricEvent(BaseModel):
 
 
 class VariantConfig(BaseModel):
-    id: str = Field(..., description="Unique identifier for the variant")
+    id: Optional[str] = Field(default_factory=lambda: str(uuid4()), description="Unique identifier for the variant")
     name: str = Field(..., description="Name of the variant")
     type: VariantType = Field(..., description="Type of variant")
     config: Dict[str, Any] = Field(default_factory=dict, description="Variant configuration")
@@ -76,6 +77,7 @@ class MetricDefinition(BaseModel):
     name: str = Field(..., description="Name of the metric")
     description: str = Field(..., description="Description of what the metric measures")
     unit: str = Field(..., description="Unit of measurement (e.g., '%', 'count', '$')")
+    data_type: MetricType = Field(..., description="Type of metric (continuous, binary, count, ratio)")
     aggregation_method: str = Field(..., description="How to aggregate the metric")
     query_template: str = Field(..., description="SQL query template for calculation")
 
@@ -113,7 +115,7 @@ class ExperimentBase(BaseModel):
 
 class ExperimentCreate(ExperimentBase):
     variants: List[VariantConfig] = Field(..., description="Variant configurations")
-    target_metrics: List[str] = Field(..., description="Metrics being measured")
+    metrics: List[str] = Field(..., description="Metrics being measured")
     guardrail_metrics: Optional[List[GuardrailConfig]] = None
     schedule: Optional[ExperimentSchedule] = None
 
@@ -125,15 +127,43 @@ class Experiment(ExperimentBase):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
+    stopped_reason: Optional[str] = Field(None, description="Reason for stopping the experiment")
+    variants: List[VariantConfig] = Field(default_factory=list, description="List of variants for this experiment")
+    metrics: List[str] = Field(default_factory=list, description="List of metric names for this experiment")
     
-    @computed_field
-    @property
-    def target_metrics(self) -> List[str]:
-        """Get the list of target metric names from the relationship."""
-        return [metric.metric_name for metric in self.metrics] if hasattr(self, 'metrics') else []
+    @model_validator(mode='before')
+    @classmethod
+    def convert_variants(cls, data: Any) -> Any:
+        if hasattr(data, '__dict__'):
+            data_dict = data.__dict__
+            print(f"Model validator:")
+            print(f"  Original data type: {type(data)}")
+            print(f"  Original data dict: {data_dict}")
+            
+            if 'variants' in data_dict and data_dict['variants']:
+                data_dict['variants'] = [
+                    {
+                        'id': v.id,
+                        'name': v.name,
+                        'type': v.type,
+                        'config': v.config,
+                        'traffic_percentage': v.traffic_percentage
+                    }
+                    for v in data_dict['variants']
+                ]
+            
+            if hasattr(data, 'metrics'):
+                print(f"  Found metrics: {data.metrics}")
+                data_dict['metrics'] = [metric.metric_name for metric in data.metrics] if data.metrics else []
+            
+            if '_sa_instance_state' in data_dict:
+                del data_dict['_sa_instance_state']
+            return data_dict
+        return data
     
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 
 class VariantAssignment(BaseModel):
