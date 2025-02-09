@@ -70,4 +70,17 @@ export class ExperimentsAPI extends BaseAPI {
     ): Promise<void> {
         await this.post(`/${experimentId}/stop`, { reason });
     }
+
+    async pauseExperiment(
+        experimentId: string,
+        reason?: string
+    ): Promise<void> {
+        await this.post(`/${experimentId}/pause`, { reason });
+    }
+
+    async resumeExperiment(
+        experimentId: string
+    ): Promise<void> {
+        await this.post(`/${experimentId}/resume`, {});
+    }
 } 

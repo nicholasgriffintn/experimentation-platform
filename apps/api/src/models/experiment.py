@@ -130,6 +130,7 @@ class Experiment(ExperimentBase):
     stopped_reason: Optional[str] = Field(None, description="Reason for stopping the experiment")
     variants: List[VariantConfig] = Field(default_factory=list, description="List of variants for this experiment")
     metrics: List[str] = Field(default_factory=list, description="List of metric names for this experiment")
+    schedule: Optional[ExperimentSchedule] = Field(None, description="Experiment schedule configuration")
     
     @model_validator(mode='before')
     @classmethod
@@ -155,6 +156,14 @@ class Experiment(ExperimentBase):
             if hasattr(data, 'metrics'):
                 print(f"  Found metrics: {data.metrics}")
                 data_dict['metrics'] = [metric.metric_name for metric in data.metrics] if data.metrics else []
+            
+            if hasattr(data, 'start_time') and data.start_time:
+                data_dict['schedule'] = {
+                    'start_time': data.start_time,
+                    'end_time': data.end_time if hasattr(data, 'end_time') else None,
+                    'ramp_up_period': data.ramp_up_period if hasattr(data, 'ramp_up_period') else None,
+                    'auto_stop_conditions': data.auto_stop_conditions if hasattr(data, 'auto_stop_conditions') else None
+                }
             
             if '_sa_instance_state' in data_dict:
                 del data_dict['_sa_instance_state']

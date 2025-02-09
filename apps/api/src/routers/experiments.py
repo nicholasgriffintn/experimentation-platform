@@ -171,6 +171,8 @@ async def update_schedule(
     
     db_experiment.start_time = schedule.start_time
     db_experiment.end_time = schedule.end_time
+    db_experiment.ramp_up_period = schedule.ramp_up_period
+    db_experiment.auto_stop_conditions = schedule.auto_stop_conditions.dict() if schedule.auto_stop_conditions else None
     db.commit()
     
     await experiment_service.update_schedule(
@@ -198,6 +200,50 @@ async def stop_experiment(
     await experiment_service.stop_experiment(
         experiment_id=experiment_id,
         reason=reason
+    )
+    
+    return {"status": "success"}
+
+@router.post("/{experiment_id}/pause")
+async def pause_experiment(
+    experiment_id: str,
+    reason: Optional[str] = None,
+    experiment_service: ExperimentService = Depends(get_experiment_service),
+    db: Session = Depends(get_db)
+):
+    """Pause an experiment"""
+    db_experiment = get_active_experiment(experiment_id, db)
+    
+    db_experiment.status = ExperimentStatus.PAUSED
+    db.commit()
+    
+    await experiment_service.pause_experiment(
+        experiment_id=experiment_id,
+        reason=reason
+    )
+    
+    return {"status": "success"}
+
+@router.post("/{experiment_id}/resume")
+async def resume_experiment(
+    experiment_id: str,
+    experiment_service: ExperimentService = Depends(get_experiment_service),
+    db: Session = Depends(get_db)
+):
+    """Resume a paused experiment"""
+    experiment = get_experiment(experiment_id, db)
+    
+    if experiment.status != ExperimentStatus.PAUSED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Experiment {experiment_id} is not paused"
+        )
+    
+    experiment.status = ExperimentStatus.RUNNING
+    db.commit()
+    
+    await experiment_service.resume_experiment(
+        experiment_id=experiment_id
     )
     
     return {"status": "success"}

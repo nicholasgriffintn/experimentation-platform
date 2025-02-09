@@ -241,3 +241,49 @@ class ExperimentService:
             grouped_data[variant_id] = [item['metric_value'] for item in group]
             
         return grouped_data
+
+    async def pause_experiment(
+        self,
+        experiment_id: str,
+        reason: Optional[str] = None
+    ) -> None:
+        """Pause an experiment"""
+        await self.data_service.record_event(
+            experiment_id=experiment_id,
+            event_data={
+                'event_type': 'pause',
+                'reason': reason
+            }
+        )
+
+    async def resume_experiment(
+        self,
+        experiment_id: str
+    ) -> None:
+        """Resume a paused experiment"""
+        await self.data_service.record_event(
+            experiment_id=experiment_id,
+            event_data={
+                'event_type': 'resume'
+            }
+        )
+
+    async def update_schedule(
+        self,
+        experiment_id: str,
+        schedule: Dict
+    ) -> None:
+        """Update experiment schedule"""
+        await self.data_service.record_event(
+            experiment_id=experiment_id,
+            event_data={
+                'event_type': 'schedule_update',
+                'schedule': schedule
+            }
+        )
+        
+        if self.cache_service:
+            config = await self.cache_service.get_experiment_config(experiment_id)
+            if config:
+                config['schedule'] = schedule
+                await self.cache_service.set_experiment_config(experiment_id, config)

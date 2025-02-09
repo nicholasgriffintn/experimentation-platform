@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { metrics as metricsStore, metricActions } from '$lib/stores/metrics';
-    import type { ExperimentType, VariantType, Variant, ExperimentCreate, ExperimentSchedule } from '$lib/types/api';
+    import type { ExperimentType, VariantType, Variant, ExperimentCreate, ExperimentSchedule, GuardrailConfig, GuardrailOperator } from '$lib/types/api';
     import { createEventDispatcher } from 'svelte';
     import { formatDateToISO } from '$lib/utils/date';
 
@@ -20,11 +20,13 @@
     let type = (experiment.type ?? 'ab_test') as ExperimentType;
     let hypothesis = experiment.hypothesis ?? '';
     let metrics = experiment.metrics ?? [];
+    let guardrail_metrics: GuardrailConfig[] = experiment.guardrail_metrics ?? [];
     let targeting_rules: Record<string, any> = experiment.targeting_rules ?? {};
     let schedule: Partial<ExperimentSchedule> = experiment.schedule ?? {};
     let parameters: Record<string, any> = experiment.parameters ?? {};
 
     const experimentTypes = ['ab_test', 'multivariate', 'feature_flag'];
+    const guardrailOperators: GuardrailOperator[] = ['gt', 'lt', 'gte', 'lte'];
 
     $: {
         if (type === 'ab_test') {
@@ -138,6 +140,21 @@
         }
     }
 
+    function addGuardrailMetric(metric_name: string) {
+        guardrail_metrics = [
+            ...guardrail_metrics,
+            {
+                metric_name,
+                threshold: 0,
+                operator: 'gt'
+            }
+        ];
+    }
+
+    function removeGuardrailMetric(index: number) {
+        guardrail_metrics = guardrail_metrics.filter((_, i) => i !== index);
+    }
+
     function handleSubmit() {
         const variantError = validateVariants();
         if (variantError) {
@@ -160,7 +177,8 @@
             variants,
             targeting_rules,
             schedule: finalSchedule,
-            parameters
+            parameters,
+            guardrail_metrics: guardrail_metrics.length > 0 ? guardrail_metrics : undefined
         };
         dispatch('submit', experimentData);
     }
@@ -230,19 +248,89 @@
             {#if $metricsStore.length === 0}
                 <p class="text-gray-600">No metrics available. Create some metrics first.</p>
             {:else}
-                <div class="grid gap-2">
-                    {#each $metricsStore as metric}
-                        <label class="flex items-center space-x-2">
-                            <input
-                                type="checkbox"
-                                value={metric.name}
-                                bind:group={metrics}
-                                disabled={loading}
-                                class="rounded"
-                            />
-                            <span>{metric.name} - {metric.description}</span>
-                        </label>
-                    {/each}
+                <div class="grid gap-4">
+                    <div class="space-y-2">
+                        <h4 class="font-medium">Primary Metrics</h4>
+                        <div class="grid gap-2">
+                            {#each $metricsStore as metric}
+                                <label class="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        value={metric.name}
+                                        bind:group={metrics}
+                                        disabled={loading}
+                                        class="rounded"
+                                    />
+                                    <span>{metric.name} - {metric.description}</span>
+                                </label>
+                            {/each}
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <h4 class="font-medium">Guardrail Metrics</h4>
+                        <p class="text-sm text-gray-600">Guardrail metrics are used as safety checks. If a guardrail is violated, the experiment will be automatically stopped.</p>
+                        
+                        <div class="space-y-4">
+                            {#each guardrail_metrics as guardrail, i}
+                                <div class="flex items-center space-x-4 p-4 border rounded-md">
+                                    <div class="flex-1">
+                                        <select
+                                            bind:value={guardrail.metric_name}
+                                            disabled={loading}
+                                            class="w-full px-3 py-2 border rounded-md"
+                                        >
+                                            {#each $metricsStore as metric}
+                                                <option value={metric.name}>{metric.name}</option>
+                                            {/each}
+                                        </select>
+                                    </div>
+                                    <div class="w-32">
+                                        <select
+                                            bind:value={guardrail.operator}
+                                            disabled={loading}
+                                            class="w-full px-3 py-2 border rounded-md"
+                                        >
+                                            {#each guardrailOperators as op}
+                                                <option value={op}>{op}</option>
+                                            {/each}
+                                        </select>
+                                    </div>
+                                    <div class="w-32">
+                                        <input
+                                            type="number"
+                                            bind:value={guardrail.threshold}
+                                            step="any"
+                                            placeholder="Threshold"
+                                            disabled={loading}
+                                            class="w-full px-3 py-2 border rounded-md"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        on:click={() => removeGuardrailMetric(i)}
+                                        disabled={loading}
+                                        class="px-2 py-1 text-red-600 hover:bg-red-50 rounded"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            {/each}
+
+                            <div class="flex flex-wrap gap-2">
+                                {#each $metricsStore.filter(m => !guardrail_metrics.some(g => g.metric_name === m.name)) as metric}
+                                    <button
+                                        type="button"
+                                        on:click={() => addGuardrailMetric(metric.name)}
+                                        disabled={loading}
+                                        class="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded-full border border-blue-200"
+                                    >
+                                        + Add {metric.name} as guardrail
+                                    </button>
+                                {/each}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             {/if}
         </div>

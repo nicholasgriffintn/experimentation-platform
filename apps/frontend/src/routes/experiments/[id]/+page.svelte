@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import { experimentResults, loading, error, experimentActions } from '$lib/stores/experiments';
-	import type { Experiment } from '$lib/types/api';
+	import type { Experiment, ExperimentSchedule } from '$lib/types/api';
 
 	export let data: PageData;
 	$: experiment = data.experiment as Experiment;
@@ -22,6 +22,55 @@
 		}
 	}
 
+	async function handlePauseExperiment(id: string) {
+		const reason = prompt('Please provide a reason for pausing the experiment:');
+		if (reason !== null) {
+			await experimentActions.pauseExperiment(id, reason);
+		}
+	}
+
+	async function handleResumeExperiment(id: string) {
+		await experimentActions.resumeExperiment(id);
+	}
+
+	async function handleScheduleUpdate(id: string) {
+		const defaultSchedule: Partial<ExperimentSchedule> = {
+			start_time: undefined,
+			end_time: undefined,
+			ramp_up_period: undefined,
+			auto_stop_conditions: undefined
+		};
+		const currentSchedule = experiment.schedule || defaultSchedule;
+		const startTime = prompt('Enter start time (YYYY-MM-DD HH:mm):', 
+			currentSchedule.start_time ? new Date(currentSchedule.start_time).toISOString().slice(0, 16) : ''
+		);
+		if (startTime === null) return;
+
+		const endTime = prompt('Enter end time (YYYY-MM-DD HH:mm) or leave empty:', 
+			currentSchedule.end_time ? new Date(currentSchedule.end_time).toISOString().slice(0, 16) : ''
+		);
+		if (endTime === null) return;
+
+		const rampUpPeriod = prompt('Enter ramp up period in hours (optional):', 
+			currentSchedule.ramp_up_period?.toString() || ''
+		);
+		if (rampUpPeriod === null) return;
+
+		if (!startTime) {
+			error.set('Start time is required');
+			return;
+		}
+
+		const schedule: ExperimentSchedule = {
+			start_time: new Date(startTime).toISOString(),
+			end_time: endTime ? new Date(endTime).toISOString() : undefined,
+			ramp_up_period: rampUpPeriod ? parseInt(rampUpPeriod) : undefined,
+			auto_stop_conditions: undefined
+		};
+
+		await experimentActions.updateSchedule(id, schedule);
+	}
+
 	function getStatusClasses(status: Experiment['status']): string {
 		switch (status) {
 			case 'running':
@@ -30,6 +79,8 @@
 				return 'bg-blue-100 text-blue-800';
 			case 'stopped':
 				return 'bg-red-100 text-red-800';
+			case 'paused':
+				return 'bg-yellow-100 text-yellow-800';
 			default:
 				return 'bg-gray-100 text-gray-800';
 		}
@@ -66,11 +117,26 @@
 						{status}
 					</span>
 					{#if status === 'running'}
+						<div class="flex space-x-2">
+							<button
+								on:click={() => handlePauseExperiment(experiment.id)}
+								class="px-4 py-2 text-yellow-600 border border-yellow-600 rounded-md hover:bg-yellow-50"
+							>
+								Pause
+							</button>
+							<button
+								on:click={() => handleStopExperiment(experiment.id)}
+								class="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700"
+							>
+								Stop
+							</button>
+						</div>
+					{:else if status === 'paused'}
 						<button
-							on:click={() => handleStopExperiment(experiment.id)}
-							class="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700"
+							on:click={() => handleResumeExperiment(experiment.id)}
+							class="px-4 py-2 text-white bg-green-600 rounded-md hover:bg-green-700"
 						>
-							Stop Experiment
+							Resume
 						</button>
 					{/if}
 				</div>
@@ -106,9 +172,17 @@
 				</div>
 
 				<div class="space-y-8">
-					{#if experiment.schedule?.start_time || experiment.schedule?.end_time}
+					{#if experiment.schedule}
 						<div class="bg-white p-6 rounded-lg shadow">
-							<h2 class="text-xl font-semibold mb-4">Schedule</h2>
+							<div class="flex justify-between items-center mb-4">
+								<h2 class="text-xl font-semibold">Schedule</h2>
+								<button
+									on:click={() => handleScheduleUpdate(experiment.id)}
+									class="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded"
+								>
+									Edit Schedule
+								</button>
+							</div>
 							<div class="grid gap-4">
 								{#if experiment.schedule.start_time}
 									<div>
@@ -126,7 +200,28 @@
 										</div>
 									</div>
 								{/if}
+								{#if experiment.schedule.ramp_up_period}
+									<div>
+										<span class="font-medium">Ramp Up Period:</span>
+										<div class="mt-1 text-gray-600">
+											{experiment.schedule.ramp_up_period} hours
+										</div>
+									</div>
+								{/if}
 							</div>
+						</div>
+					{:else}
+						<div class="bg-white p-6 rounded-lg shadow">
+							<div class="flex justify-between items-center mb-4">
+								<h2 class="text-xl font-semibold">Schedule</h2>
+								<button
+									on:click={() => handleScheduleUpdate(experiment.id)}
+									class="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded"
+								>
+									Add Schedule
+								</button>
+							</div>
+							<p class="text-gray-600">No schedule configured</p>
 						</div>
 					{/if}
 
@@ -134,11 +229,30 @@
 						<h2 class="text-xl font-semibold mb-4">Metrics</h2>
 						{#if experiment.metrics?.length}
 							<div class="space-y-2">
-								{#each experiment.metrics as metric}
-									<div class="p-3 bg-gray-50 rounded-md">
-										<span class="font-medium">{metric}</span>
+								<div class="mb-6">
+									<h3 class="text-lg font-medium mb-3">Primary Metrics</h3>
+									{#each experiment.metrics as metric}
+										<div class="p-3 bg-gray-50 rounded-md">
+											<span class="font-medium">{metric}</span>
+										</div>
+									{/each}
+								</div>
+
+								{#if experiment.guardrail_metrics?.length}
+									<div>
+										<h3 class="text-lg font-medium mb-3">Guardrail Metrics</h3>
+										<div class="space-y-2">
+											{#each experiment.guardrail_metrics as guardrail}
+												<div class="p-3 bg-gray-50 rounded-md flex items-center justify-between">
+													<span class="font-medium">{guardrail.metric_name}</span>
+													<span class="text-gray-600">
+														Must be {guardrail.operator} {guardrail.threshold}
+													</span>
+												</div>
+											{/each}
+										</div>
 									</div>
-								{/each}
+								{/if}
 							</div>
 						{:else}
 							<p class="text-gray-600">No target metrics configured</p>

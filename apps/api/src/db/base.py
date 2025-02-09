@@ -23,6 +23,8 @@ class Experiment(Base):
     status = Column(SQLEnum(ExperimentStatus), nullable=False)
     start_time = Column(DateTime)
     end_time = Column(DateTime)
+    ramp_up_period = Column(Integer, nullable=True)  # in hours
+    auto_stop_conditions = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     started_at = Column(DateTime)

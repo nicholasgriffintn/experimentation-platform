@@ -42,6 +42,7 @@ export interface ExperimentCreate {
     targeting_rules?: Record<string, any>;
     schedule?: ExperimentSchedule;
     parameters?: Record<string, any>;
+    guardrail_metrics?: GuardrailConfig[];
 }
 
 export interface Experiment extends ExperimentCreate {
@@ -73,4 +74,12 @@ export interface ExperimentResults {
     experiment_id: string;
     metrics: MetricResult[];
     last_updated: string;
+}
+
+export type GuardrailOperator = 'gt' | 'lt' | 'gte' | 'lte';
+
+export interface GuardrailConfig {
+    metric_name: string;
+    threshold: number;
+    operator: GuardrailOperator;
 } 

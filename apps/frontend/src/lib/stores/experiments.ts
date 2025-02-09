@@ -1,6 +1,6 @@
 import { writable, derived } from 'svelte/store';
 
-import type { Experiment, ExperimentResults, ExperimentCreate } from '../types/api';
+import type { Experiment, ExperimentResults, ExperimentCreate, ExperimentSchedule } from '../types/api';
 import { api } from '../api';
 
 export const experiments = writable<Experiment[]>([]);
@@ -91,6 +91,51 @@ export const experimentActions = {
             );
         } catch (e) {
             error.set(e instanceof Error ? e.message : 'Failed to stop experiment');
+        }
+    },
+
+    async pauseExperiment(experimentId: string, reason?: string) {
+        try {
+            await api.experiments.pauseExperiment(experimentId, reason);
+            experiments.update(current => 
+                current.map(exp => 
+                    exp.id === experimentId 
+                        ? { ...exp, status: 'paused' }
+                        : exp
+                )
+            );
+        } catch (e) {
+            error.set(e instanceof Error ? e.message : 'Failed to pause experiment');
+        }
+    },
+
+    async resumeExperiment(experimentId: string) {
+        try {
+            await api.experiments.resumeExperiment(experimentId);
+            experiments.update(current => 
+                current.map(exp => 
+                    exp.id === experimentId 
+                        ? { ...exp, status: 'running' }
+                        : exp
+                )
+            );
+        } catch (e) {
+            error.set(e instanceof Error ? e.message : 'Failed to resume experiment');
+        }
+    },
+
+    async updateSchedule(experimentId: string, schedule: ExperimentSchedule) {
+        try {
+            await api.experiments.updateSchedule(experimentId, schedule);
+            experiments.update(current => 
+                current.map(exp => 
+                    exp.id === experimentId 
+                        ? { ...exp, schedule }
+                        : exp
+                )
+            );
+        } catch (e) {
+            error.set(e instanceof Error ? e.message : 'Failed to update experiment schedule');
         }
     }
 }; 
