@@ -32,7 +32,15 @@ async def list_experiments(
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db)
 ):
-    """List all experiments"""
+    """
+    List all experiments in the system.
+
+    Returns a list of all experiments with their configurations, variants, metrics, and current status.
+    Results are ordered by creation date, with most recent experiments first.
+
+    Returns:
+        List[ExperimentModel]: A list of experiment objects with full configuration details
+    """
     experiments = get_experiments_list(db)
     return experiments
 
@@ -43,7 +51,25 @@ async def create_experiment(
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db)
 ):
-    """Create a new experiment"""
+    """
+    Create a new experiment.
+
+    Creates a new experiment with the specified configuration. The experiment will be initialized
+    in the background and will start according to the provided schedule.
+
+    Args:
+        experiment (ExperimentCreate): The experiment configuration including name, description,
+            variants, metrics, and schedule.
+        background_tasks: FastAPI background tasks handler
+        experiment_service: Injected experiment service
+        db: Database session
+
+    Returns:
+        ExperimentModel: The created experiment object
+
+    Raises:
+        HTTPException: 400 if invalid metrics are specified
+    """
     for metric_name in experiment.metrics:
         if not await validate_metric(metric_name, db):
             raise HTTPException(
@@ -67,7 +93,23 @@ async def get_experiment(
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db)
 ):
-    """Get an experiment"""
+    """
+    Get a specific experiment by ID.
+
+    Retrieves detailed information about a single experiment including its configuration,
+    variants, metrics, and current status.
+
+    Args:
+        experiment_id (str): The ID of the experiment to retrieve
+        experiment_service: Injected experiment service
+        db: Database session
+
+    Returns:
+        ExperimentModel: The requested experiment with full configuration details
+
+    Raises:
+        HTTPException: 404 if experiment not found
+    """
     return get_experiment(experiment_id, db)
 
 @router.post("/{experiment_id}/assign", response_model=VariantAssignment)
@@ -77,7 +119,30 @@ async def assign_variant(
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db)
 ):
-    """Assign a variant to a user"""
+    """
+    Assign a variant to a user.
+
+    Deterministically assigns a variant to a user based on their context and the experiment's
+    configuration. The assignment takes into account:
+    - Traffic allocation
+    - Targeting rules
+    - Randomization seed
+    - User attributes
+
+    Args:
+        experiment_id (str): The ID of the experiment
+        user_context (UserContext): Context information about the user (e.g., user_id, session_id)
+        experiment_service: Injected experiment service
+        db: Database session
+
+    Returns:
+        VariantAssignment: The assigned variant details including configuration
+
+    Raises:
+        HTTPException: 404 if experiment not found
+        HTTPException: 400 if experiment is not running
+        HTTPException: 400 if user does not meet targeting criteria
+    """
     db_experiment = get_active_experiment(experiment_id, db)
     
     variant = await experiment_service.assign_variant(
@@ -106,7 +171,26 @@ async def record_exposure(
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db)
 ):
-    """Record an exposure event"""
+    """
+    Record an exposure event for an experiment.
+
+    Records when a user is exposed to a specific variant in an experiment. This is crucial
+    for accurate experiment analysis and should be called when a user encounters the experimental feature.
+
+    Args:
+        experiment_id (str): The ID of the experiment
+        user_context (UserContext): Context information about the user (e.g., user_id, session_id)
+        metadata (Optional[Dict]): Additional metadata about the exposure event
+        experiment_service: Injected experiment service
+        db: Database session
+
+    Returns:
+        dict: Success status
+
+    Raises:
+        HTTPException: 404 if experiment not found
+        HTTPException: 400 if experiment is not running
+    """
     db_experiment = get_active_experiment(experiment_id, db)
     
     await experiment_service.record_exposure(
@@ -124,7 +208,30 @@ async def record_metric(
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db)
 ):
-    """Record a metric event"""
+    """
+    Record a metric event for an experiment.
+
+    Records a metric value for a user in an experiment. This endpoint should be called
+    whenever a metric value is available for a user who has been exposed to the experiment.
+
+    Args:
+        experiment_id (str): The ID of the experiment
+        metric_event (MetricEvent): The metric event details including:
+            - metric_name: Name of the metric
+            - value: The metric value
+            - user_context: User context information
+            - metadata: Optional additional metadata
+        experiment_service: Injected experiment service
+        db: Database session
+
+    Returns:
+        dict: Success status
+
+    Raises:
+        HTTPException: 404 if experiment not found
+        HTTPException: 400 if experiment is not running
+        HTTPException: 400 if metric is not configured for this experiment
+    """
     db_experiment = get_active_experiment(experiment_id, db)
     
     if not is_valid_experiment_metric(experiment_id, metric_event.metric_name, db):
@@ -150,7 +257,28 @@ async def get_results(
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db)
 ):
-    """Get experiment results"""
+    """
+    Get experiment results and analysis.
+
+    Retrieves the current results and statistical analysis for an experiment. Results include:
+    - Metric values per variant
+    - Statistical significance calculations
+    - Confidence intervals
+    - Sample size information
+
+    Args:
+        experiment_id (str): The ID of the experiment
+        metrics (Optional[List[str]]): Optional list of specific metrics to analyze. If not provided,
+            all experiment metrics will be analyzed.
+        experiment_service: Injected experiment service
+        db: Database session
+
+    Returns:
+        ExperimentResults: Detailed results and analysis for the experiment
+
+    Raises:
+        HTTPException: 404 if experiment not found
+    """
     db_experiment = get_experiment(experiment_id, db)
     
     results = await experiment_service.analyze_results(
@@ -167,7 +295,30 @@ async def update_schedule(
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db)
 ):
-    """Update experiment schedule"""
+    """
+    Update an experiment's schedule.
+
+    Updates the scheduling configuration of an experiment, including:
+    - Start and end times
+    - Ramp-up period
+    - Auto-stop conditions
+
+    Args:
+        experiment_id (str): The ID of the experiment
+        schedule (ExperimentSchedule): The new schedule configuration including:
+            - start_time: When to start the experiment
+            - end_time: When to end the experiment
+            - ramp_up_period: Optional gradual traffic increase period
+            - auto_stop_conditions: Optional conditions for early stopping
+        experiment_service: Injected experiment service
+        db: Database session
+
+    Returns:
+        dict: Success status
+
+    Raises:
+        HTTPException: 404 if experiment not found
+    """
     db_experiment = get_experiment(experiment_id, db)
     
     db_experiment.start_time = schedule.start_time
@@ -190,7 +341,28 @@ async def stop_experiment(
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db)
 ):
-    """Stop an experiment"""
+    """
+    Stop an active experiment.
+
+    Stops a running experiment and marks it as completed. This will:
+    - Stop new user assignments to variants
+    - Continue collecting data for already exposed users
+    - Generate final results
+    - Update experiment status
+
+    Args:
+        experiment_id (str): The ID of the experiment to stop
+        reason (Optional[str]): Optional reason for stopping the experiment
+        experiment_service: Injected experiment service
+        db: Database session
+
+    Returns:
+        dict: Success status
+
+    Raises:
+        HTTPException: 404 if experiment not found
+        HTTPException: 400 if experiment is not in running state
+    """
     db_experiment = get_active_experiment(experiment_id, db)
     
     db_experiment.status = ExperimentStatus.STOPPED
@@ -212,7 +384,28 @@ async def pause_experiment(
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db)
 ):
-    """Pause an experiment"""
+    """
+    Pause a running experiment.
+
+    Temporarily pauses a running experiment. This will:
+    - Stop new user assignments to variants
+    - Preserve all existing assignments
+    - Continue collecting data for already exposed users
+    - Allow the experiment to be resumed later
+
+    Args:
+        experiment_id (str): The ID of the experiment to pause
+        reason (Optional[str]): Optional reason for pausing the experiment
+        experiment_service: Injected experiment service
+        db: Database session
+
+    Returns:
+        dict: Success status
+
+    Raises:
+        HTTPException: 404 if experiment not found
+        HTTPException: 400 if experiment is not in running state
+    """
     db_experiment = get_active_experiment(experiment_id, db)
     
     db_experiment.status = ExperimentStatus.PAUSED
@@ -250,7 +443,18 @@ async def resume_experiment(
     return {"status": "success"}
 
 def get_experiments_list(db: Session) -> List[DBExperiment]:
-    """Get all experiments"""
+    """
+    Get all experiments from the database.
+
+    Retrieves all experiments with their related entities (variants, metrics, guardrails)
+    using eager loading to minimize database queries.
+
+    Args:
+        db: Database session
+
+    Returns:
+        List[DBExperiment]: List of all experiments with their related entities
+    """
     print("Executing query with experiment metrics...")
     experiments = db.query(DBExperiment).options(
         joinedload(DBExperiment.variants),
@@ -258,11 +462,25 @@ def get_experiments_list(db: Session) -> List[DBExperiment]:
         joinedload(DBExperiment.guardrail_metrics)
     ).all()
     
-    
     return experiments
 
 def get_experiment(experiment_id: str, db: Session) -> DBExperiment:
-    """Get experiment or raise 404"""
+    """
+    Get a specific experiment by ID or raise 404.
+
+    Retrieves a single experiment with its related entities using eager loading.
+    Raises an HTTP 404 exception if the experiment is not found.
+
+    Args:
+        experiment_id: The ID of the experiment to retrieve
+        db: Database session
+
+    Returns:
+        DBExperiment: The requested experiment with its related entities
+
+    Raises:
+        HTTPException: 404 if experiment not found
+    """
     experiment = db.query(DBExperiment).options(
         joinedload(DBExperiment.variants),
         joinedload(DBExperiment.metrics),
@@ -278,7 +496,24 @@ def get_experiment(experiment_id: str, db: Session) -> DBExperiment:
     return experiment
 
 def get_active_experiment(experiment_id: str, db: Session) -> DBExperiment:
-    """Get running experiment or raise error"""
+    """
+    Get a running experiment or raise error.
+
+    Retrieves an experiment and verifies it is in the running state.
+    Raises appropriate HTTP exceptions if the experiment is not found
+    or not in the running state.
+
+    Args:
+        experiment_id: The ID of the experiment to retrieve
+        db: Database session
+
+    Returns:
+        DBExperiment: The requested running experiment
+
+    Raises:
+        HTTPException: 404 if experiment not found
+        HTTPException: 400 if experiment is not running
+    """
     experiment = get_experiment(experiment_id, db)
     if experiment.status != ExperimentStatus.RUNNING:
         raise HTTPException(

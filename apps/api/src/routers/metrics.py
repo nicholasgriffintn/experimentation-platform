@@ -10,7 +10,26 @@ router = APIRouter()
 
 @router.post("/", response_model=MetricDefinition)
 async def create_metric(metric: MetricDefinition, db: Session = Depends(get_db)):
-    """Create a new metric definition"""
+    """
+    Create a new metric definition.
+
+    Creates a new metric that can be used in experiments. The metric definition includes:
+    - How the metric is calculated
+    - What type of data it represents
+    - How it should be aggregated
+    - The SQL query template for data collection
+
+    Args:
+        metric (MetricDefinition): The metric configuration including name, description,
+            data type, and aggregation method
+        db: Database session
+
+    Returns:
+        MetricDefinition: The created metric definition
+
+    Raises:
+        HTTPException: 400 if metric with same name already exists
+    """
     db_metric = db.query(DBMetricDefinition).filter(DBMetricDefinition.name == metric.name).first()
     if db_metric:
         raise HTTPException(
@@ -33,12 +52,34 @@ async def create_metric(metric: MetricDefinition, db: Session = Depends(get_db))
 
 @router.get("/", response_model=List[MetricDefinition])
 async def list_metrics(db: Session = Depends(get_db)):
-    """List all metric definitions"""
+    """
+    List all metric definitions.
+
+    Returns a list of all available metrics that can be used in experiments.
+    Each metric includes its configuration and query template.
+
+    Returns:
+        List[MetricDefinition]: List of all metric definitions
+    """
     return db.query(DBMetricDefinition).all()
 
 @router.get("/{metric_name}", response_model=MetricDefinition)
 async def get_metric(metric_name: str, db: Session = Depends(get_db)):
-    """Get a specific metric by name"""
+    """
+    Get a specific metric definition by name.
+
+    Retrieves detailed information about a single metric definition.
+
+    Args:
+        metric_name (str): The name of the metric to retrieve
+        db: Database session
+
+    Returns:
+        MetricDefinition: The requested metric definition
+
+    Raises:
+        HTTPException: 404 if metric not found
+    """
     db_metric = db.query(DBMetricDefinition).filter(DBMetricDefinition.name == metric_name).first()
     if not db_metric:
         raise HTTPException(
@@ -49,7 +90,22 @@ async def get_metric(metric_name: str, db: Session = Depends(get_db)):
 
 @router.delete("/{metric_name}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_metric(metric_name: str, db: Session = Depends(get_db)):
-    """Delete a metric"""
+    """
+    Delete a metric definition.
+
+    Permanently removes a metric definition. Note that this will not affect historical
+    data for experiments that used this metric.
+
+    Args:
+        metric_name (str): The name of the metric to delete
+        db: Database session
+
+    Returns:
+        None
+
+    Raises:
+        HTTPException: 404 if metric not found
+    """
     db_metric = db.query(DBMetricDefinition).filter(DBMetricDefinition.name == metric_name).first()
     if not db_metric:
         raise HTTPException(

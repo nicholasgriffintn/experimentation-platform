@@ -9,10 +9,37 @@ from .db.base import Base
 from .db.session import engine
 from .services.scheduler import ExperimentScheduler
 
+description = """
+This API provides a comprehensive suite of endpoints for managing and analyzing experiments and feature flags.
+"""
+
+tags_metadata = [
+    {
+        "name": "experiments",
+        "description": "Manage A/B tests and experiments. Includes creation, monitoring, and analysis endpoints.",
+    },
+    {
+        "name": "metrics",
+        "description": "Define and manage metrics that can be tracked in experiments.",
+    },
+    {
+        "name": "features",
+        "description": "Manage feature definitions and configurations for experiments.",
+    },
+]
+
 app = FastAPI(
     title=settings.api_name,
-    description=settings.api_description,
+    description=description,
     version=settings.api_version,
+    openapi_tags=tags_metadata,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+    contact={
+        "name": "Nicholas Griffin",
+        "url": "https://nicholasgriffin.dev",
+    }
 )
 
 app.add_middleware(
@@ -55,9 +82,20 @@ async def shutdown_event():
         print("Stopping scheduler")
         await scheduler.stop()
 
-@app.get("/health")
+@app.get("/health", tags=["system"])
 async def health_check():
-    """Health check endpoint"""
+    """
+    Health check endpoint for monitoring and load balancers.
+    
+    Returns:
+        dict: A dictionary containing the API status and scheduler state
+        
+    Example Response:
+        {
+            "status": "healthy",
+            "scheduler": "running"
+        }
+    """
     return {
         "status": "healthy",
         "scheduler": "running" if scheduler and scheduler.running else "stopped"
