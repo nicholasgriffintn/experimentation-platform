@@ -4,10 +4,10 @@ from .correction import MultipleTestingCorrection
 from .frequentist import ExperimentResult, StatisticalAnalysisService
 
 __all__ = [
-    'StatisticalAnalysisService',
-    'ExperimentResult',
-    'BayesianAnalysisService',
-    'MultipleTestingCorrection',
-    'CombinedAnalysisService',
-    'CombinedAnalysisResult'
-] 
+    "StatisticalAnalysisService",
+    "ExperimentResult",
+    "BayesianAnalysisService",
+    "MultipleTestingCorrection",
+    "CombinedAnalysisService",
+    "CombinedAnalysisResult",
+]

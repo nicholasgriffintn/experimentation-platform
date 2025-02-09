@@ -46,7 +46,7 @@ app = FastAPI(
     contact={
         "name": "Nicholas Griffin",
         "url": "https://nicholasgriffin.dev",
-    }
+    },
 )
 
 app.add_middleware(
@@ -67,6 +67,7 @@ app.include_router(features.router, prefix="/api/v1/features", tags=["features"]
 
 scheduler = None
 
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on startup."""
@@ -76,9 +77,7 @@ async def startup_event():
         db = next(get_db())
         experiment_service = get_experiment_service(db)
         scheduler = ExperimentScheduler(
-            experiment_service=experiment_service,
-            db=db,
-            check_interval=60
+            experiment_service=experiment_service, db=db, check_interval=60
         )
         asyncio.create_task(scheduler.start())
     else:
@@ -87,6 +86,7 @@ async def startup_event():
     db = next(get_db())
     await seed_all(db)
 
+
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up services on shutdown."""
@@ -94,14 +94,15 @@ async def shutdown_event():
         logger.info("Stopping scheduler")
         await scheduler.stop()
 
+
 @app.get("/health", tags=["system"])
 async def health_check():
     """
     Health check endpoint for monitoring and load balancers.
-    
+
     Returns:
         dict: A dictionary containing the API status and scheduler state
-        
+
     Example Response:
         {
             "status": "healthy",
@@ -110,9 +111,11 @@ async def health_check():
     """
     return {
         "status": "healthy",
-        "scheduler": "running" if scheduler and scheduler.running else "stopped"
+        "scheduler": "running" if scheduler and scheduler.running else "stopped",
     }
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

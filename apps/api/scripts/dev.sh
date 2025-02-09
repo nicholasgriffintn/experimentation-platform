@@ -20,7 +20,7 @@ function format() {
 
 function lint() {
     echo "Linting code..."
-    python -m ruff src tests
+    python -m ruff check src tests
     python -m mypy src tests
 }
 
@@ -49,7 +49,7 @@ case "$1" in
         all
         ;;
     *)
-        echo "🦍 Usage: $0 {format|lint|test|all}"
+        echo "Usage: $0 {format|lint|test|all}"
         exit 1
         ;;
 esac

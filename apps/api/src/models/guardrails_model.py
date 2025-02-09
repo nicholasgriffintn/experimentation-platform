@@ -19,10 +19,10 @@ class GuardrailMetricBase(BaseModel):
     operator: GuardrailOperator
     description: Optional[str] = None
 
-    @validator('threshold')
+    @validator("threshold")
     def validate_threshold(cls, v):
         if not isinstance(v, (int, float)):
-            raise ValueError('Threshold must be a number')
+            raise ValueError("Threshold must be a number")
         return float(v)
 
 
@@ -38,4 +38,4 @@ class GuardrailMetric(GuardrailMetricBase):
     violation_count: int = 0
 
     class Config:
-        from_attributes = True 
+        from_attributes = True

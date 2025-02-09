@@ -9,24 +9,26 @@ from .frequentist import ExperimentResult, StatisticalAnalysisService
 @dataclass
 class CombinedAnalysisResult:
     """Combined results from both frequentist and Bayesian analysis"""
+
     metric_name: str
     frequentist_results: ExperimentResult
     bayesian_results: Dict
     corrected_p_value: Optional[float] = None
 
+
 class CombinedAnalysisService:
     """Service that combines frequentist and Bayesian analysis approaches"""
-    
+
     def __init__(
         self,
         frequentist_service: StatisticalAnalysisService,
         bayesian_service: BayesianAnalysisService,
-        correction_service: MultipleTestingCorrection
+        correction_service: MultipleTestingCorrection,
     ):
         self.frequentist_service = frequentist_service
         self.bayesian_service = bayesian_service
         self.correction_service = correction_service
-        
+
     def analyze_experiment(
         self,
         control_data: List[float],
@@ -34,11 +36,11 @@ class CombinedAnalysisService:
         metric_name: str,
         metric_type: str = "continuous",
         alpha: float = 0.05,
-        correction_method: Optional[str] = None
+        correction_method: Optional[str] = None,
     ) -> CombinedAnalysisResult:
         """
         Analyze experiment data using both frequentist and Bayesian approaches
-        
+
         Parameters
         ----------
         control_data : List[float]
@@ -53,7 +55,7 @@ class CombinedAnalysisService:
             Significance level for frequentist analysis
         correction_method : Optional[str]
             Multiple testing correction method (None, 'fdr_bh', 'holm')
-            
+
         Returns
         -------
         CombinedAnalysisResult
@@ -63,45 +65,42 @@ class CombinedAnalysisService:
             control_data=control_data,
             variant_data=variant_data,
             metric_type=metric_type,
-            alpha=alpha
+            alpha=alpha,
         )
-        
+
         if metric_type == "binary":
             bayes_results = self.bayesian_service.analyze_binary_metric(
-                control_data=control_data,
-                variant_data=variant_data
+                control_data=control_data, variant_data=variant_data
             )
         else:
             bayes_results = self.bayesian_service.analyze_continuous_metric(
-                control_data=control_data,
-                variant_data=variant_data
+                control_data=control_data, variant_data=variant_data
             )
-            
+
         corrected_p_value = None
         if correction_method and freq_results.p_value is not None:
             corrected_p_values = self.correction_service.apply_correction(
-                [freq_results.p_value],
-                method=correction_method
+                [freq_results.p_value], method=correction_method
             )
             corrected_p_value = corrected_p_values[0]
-            
+
         return CombinedAnalysisResult(
             metric_name=metric_name,
             frequentist_results=freq_results,
             bayesian_results=bayes_results,
-            corrected_p_value=corrected_p_value
+            corrected_p_value=corrected_p_value,
         )
-        
+
     def analyze_multiple_metrics(
         self,
         metrics_data: Dict[str, Dict],
         metric_types: Dict[str, str],
         alpha: float = 0.05,
-        correction_method: str = "fdr_bh"
+        correction_method: str = "fdr_bh",
     ) -> Dict[str, CombinedAnalysisResult]:
         """
         Analyze multiple metrics with correction for multiple testing
-        
+
         Parameters
         ----------
         metrics_data : Dict[str, Dict]
@@ -113,7 +112,7 @@ class CombinedAnalysisService:
             Significance level for frequentist analysis
         correction_method : str
             Multiple testing correction method ('fdr_bh' or 'holm')
-            
+
         Returns
         -------
         Dict[str, CombinedAnalysisResult]
@@ -121,28 +120,27 @@ class CombinedAnalysisService:
         """
         uncorrected_results = {}
         p_values = []
-        
+
         for metric_name, data in metrics_data.items():
             metric_type = metric_types[metric_name]
             result = self.analyze_experiment(
-                control_data=data['control'],
-                variant_data=data['variant'],
+                control_data=data["control"],
+                variant_data=data["variant"],
                 metric_name=metric_name,
                 metric_type=metric_type,
-                alpha=alpha
+                alpha=alpha,
             )
             uncorrected_results[metric_name] = result
             if result.frequentist_results.p_value is not None:
                 p_values.append(result.frequentist_results.p_value)
-                
+
         if p_values:
             corrected_p_values = self.correction_service.apply_correction(
-                p_values,
-                method=correction_method
+                p_values, method=correction_method
             )
-            
+
             for i, (metric_name, result) in enumerate(uncorrected_results.items()):
                 if result.frequentist_results.p_value is not None:
                     result.corrected_p_value = corrected_p_values[i]
-                    
-        return uncorrected_results 
+
+        return uncorrected_results

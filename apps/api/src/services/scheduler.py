@@ -1,23 +1,20 @@
 import asyncio
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from sqlalchemy.orm import Session
 
 from ..db.base import Experiment
-from ..models.analysis import AnalysisMethod
-from ..models.experiments import ExperimentStatus
-from ..models.guardrails import GuardrailMetric
+from ..models.analysis_model import AnalysisMethod
+from ..models.experiments_model import ExperimentStatus
+from ..models.guardrails_model import GuardrailMetric
 from ..utils.logger import logger
 from .experiments import ExperimentService
 
 
 class ExperimentScheduler:
     def __init__(
-        self,
-        experiment_service: ExperimentService,
-        db: Session,
-        check_interval: int = 60
+        self, experiment_service: ExperimentService, db: Session, check_interval: int = 60
     ):
         self.experiment_service = experiment_service
         self.db = db
@@ -41,21 +38,22 @@ class ExperimentScheduler:
     async def check_experiments(self):
         """If scheduled, start the experiment, stop if it should end. Check guardrails for running experiments."""
         now = datetime.utcnow()
-        
-        experiments = self.db.query(Experiment).filter(
-            Experiment.status.in_([
-                ExperimentStatus.DRAFT,
-                ExperimentStatus.RUNNING
-            ])
-        ).all()
-        
+
+        experiments = (
+            self.db.query(Experiment)
+            .filter(Experiment.status.in_([ExperimentStatus.DRAFT, ExperimentStatus.RUNNING]))
+            .all()
+        )
+
         for experiment in experiments:
-            if (experiment.status == ExperimentStatus.DRAFT and 
-                experiment.start_time and 
-                experiment.start_time <= now):
+            if (
+                experiment.status == ExperimentStatus.DRAFT
+                and experiment.start_time
+                and experiment.start_time <= now
+            ):
                 await self.start_experiment(experiment)
-            
-            elif (experiment.status == ExperimentStatus.RUNNING):
+
+            elif experiment.status == ExperimentStatus.RUNNING:
                 if experiment.end_time and experiment.end_time <= now:
                     await self.stop_experiment(experiment)
                     continue
@@ -75,10 +73,10 @@ class ExperimentScheduler:
 
             experiment.started_at = datetime.utcnow()
             self.db.commit()
-            
-            if experiment.parameters.get('auto_analyze_interval'):
+
+            if experiment.parameters.get("auto_analyze_interval"):
                 self.schedule_automated_analysis(experiment)
-            
+
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error starting experiment {experiment.id}: {str(e)}")
@@ -100,8 +98,8 @@ class ExperimentScheduler:
                     self._schedule_traffic_increase(
                         experiment_id=experiment.id,
                         delay_hours=hours_per_step * step,
-                        target_percentage=initial_traffic_percentage + 
-                            ((100 - initial_traffic_percentage) * step / steps)
+                        target_percentage=initial_traffic_percentage
+                        + ((100 - initial_traffic_percentage) * step / steps),
                     )
                 )
 
@@ -110,26 +108,29 @@ class ExperimentScheduler:
             logger.error(f"Error applying ramp-up for experiment {experiment.id}: {str(e)}")
             raise
 
-    async def _schedule_traffic_increase(self, experiment_id: str, delay_hours: float, target_percentage: float):
+    async def _schedule_traffic_increase(
+        self, experiment_id: str, delay_hours: float, target_percentage: float
+    ):
         """Schedule a traffic increase after a delay"""
         await asyncio.sleep(delay_hours * 3600)
-        
-        experiment = self.db.query(Experiment).filter(
-            Experiment.id == experiment_id,
-            Experiment.status == ExperimentStatus.RUNNING
-        ).first()
-        
+
+        experiment = (
+            self.db.query(Experiment)
+            .filter(Experiment.id == experiment_id, Experiment.status == ExperimentStatus.RUNNING)
+            .first()
+        )
+
         if experiment:
             try:
                 experiment.traffic_allocation = target_percentage
                 self.db.commit()
-                
+
                 await self.experiment_service.record_event(
                     experiment_id=experiment_id,
                     event_data={
-                        'event_type': 'traffic_allocation_update',
-                        'traffic_allocation': target_percentage
-                    }
+                        "event_type": "traffic_allocation_update",
+                        "traffic_allocation": target_percentage,
+                    },
                 )
             except Exception as e:
                 logger.error(f"Error increasing traffic for experiment {experiment_id}: {str(e)}")
@@ -141,62 +142,60 @@ class ExperimentScheduler:
             return
 
         try:
-            if 'min_sample_size' in conditions:
+            if "min_sample_size" in conditions:
                 sample_size = await self._get_experiment_sample_size(experiment)
-                if sample_size >= conditions['min_sample_size']:
-                    await self.stop_experiment(
-                        experiment,
-                        reason="Reached target sample size"
-                    )
+                if sample_size >= conditions["min_sample_size"]:
+                    await self.stop_experiment(experiment, reason="Reached target sample size")
                     return
 
             results = await self.experiment_service.analyze_results(experiment.id)
-            
+
             if experiment.analysis_config.sequential_testing:
                 stopping_threshold = experiment.analysis_config.stopping_threshold
                 method = experiment.analysis_config.method
-                
-                for metric_results in results.get('metrics', {}).values():
+
+                for metric_results in results.get("metrics", {}).values():
                     for result in metric_results.values():
                         if method == AnalysisMethod.BAYESIAN:
-                            prob_improvement = 1 - result.get('p_value', 0)
-                            if (prob_improvement > (1 - stopping_threshold) or 
-                                prob_improvement < stopping_threshold):
+                            prob_improvement = 1 - result.get("p_value", 0)
+                            if (
+                                prob_improvement > (1 - stopping_threshold)
+                                or prob_improvement < stopping_threshold
+                            ):
                                 await self.stop_experiment(
                                     experiment,
-                                    reason=f"Sequential stopping criterion met: probability of improvement = {prob_improvement:.3f}"
+                                    reason=f"Sequential stopping criterion met: probability of improvement = {prob_improvement:.3f}",
                                 )
                                 return
                         else:
-                            p_value = result.get('p_value', 1)
+                            p_value = result.get("p_value", 1)
                             if p_value < stopping_threshold:
                                 await self.stop_experiment(
                                     experiment,
-                                    reason=f"Sequential stopping criterion met: p-value = {p_value:.3f}"
+                                    reason=f"Sequential stopping criterion met: p-value = {p_value:.3f}",
                                 )
                                 return
 
-            if 'significance_threshold' in conditions:
-                for metric_results in results.get('metrics', {}).values():
+            if "significance_threshold" in conditions:
+                for metric_results in results.get("metrics", {}).values():
                     for result in metric_results.values():
-                        if result.get('p_value', 1) <= conditions['significance_threshold']:
+                        if result.get("p_value", 1) <= conditions["significance_threshold"]:
                             await self.stop_experiment(
                                 experiment,
-                                reason=f"Reached statistical significance (p-value: {result['p_value']:.3f})"
+                                reason=f"Reached statistical significance (p-value: {result['p_value']:.3f})",
                             )
                             return
 
-            if 'max_duration_hours' in conditions:
+            if "max_duration_hours" in conditions:
                 duration = datetime.utcnow() - experiment.started_at
-                if duration.total_seconds() / 3600 >= conditions['max_duration_hours']:
-                    await self.stop_experiment(
-                        experiment,
-                        reason="Reached maximum duration"
-                    )
+                if duration.total_seconds() / 3600 >= conditions["max_duration_hours"]:
+                    await self.stop_experiment(experiment, reason="Reached maximum duration")
                     return
 
         except Exception as e:
-            logger.error(f"Error checking auto-stop conditions for experiment {experiment.id}: {str(e)}")
+            logger.error(
+                f"Error checking auto-stop conditions for experiment {experiment.id}: {str(e)}"
+            )
 
     async def _get_experiment_sample_size(self, experiment: Experiment) -> int:
         """
@@ -205,57 +204,51 @@ class ExperimentScheduler:
         to ensure we have sufficient data across all variants.
         """
         try:
-            exposure_data = await self.experiment_service.data_service.get_exposure_data(experiment.id)
+            exposure_data = await self.experiment_service.data_service.get_exposure_data(
+                experiment.id
+            )
             if not exposure_data:
                 return 0
 
             variant_sizes = {}
             for record in exposure_data:
-                variant_id = record.get('variant_id')
-                user_id = record.get('user_id')
-                
+                variant_id = record.get("variant_id")
+                user_id = record.get("user_id")
+
                 if not variant_id or not user_id:
                     continue
-                    
+
                 if variant_id not in variant_sizes:
                     variant_sizes[variant_id] = set()
                 variant_sizes[variant_id].add(user_id)
-            
+
             if not variant_sizes:
                 return 0
-            
+
             return min(len(users) for users in variant_sizes.values())
-            
+
         except Exception as e:
             logger.error(f"Error getting sample size for experiment {experiment.id}: {str(e)}")
             return 0
 
-    async def stop_experiment(
-        self,
-        experiment: Experiment,
-        reason: Optional[str] = None
-    ):
+    async def stop_experiment(self, experiment: Experiment, reason: Optional[str] = None):
         """Stop an experiment and run final analysis"""
         try:
             experiment.status = ExperimentStatus.COMPLETED
             experiment.ended_at = datetime.utcnow()
             experiment.stopped_reason = reason
             self.db.commit()
-            
+
             if experiment.id in self.scheduled_tasks:
                 self.scheduled_tasks[experiment.id].cancel()
                 del self.scheduled_tasks[experiment.id]
-            
+
             await self.experiment_service.analyze_results(experiment.id)
-            
+
             await self.experiment_service.data_service.record_event(
-                experiment_id=experiment.id,
-                event_data={
-                    'event_type': 'stop',
-                    'reason': reason
-                }
+                experiment_id=experiment.id, event_data={"event_type": "stop", "reason": reason}
             )
-            
+
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error stopping experiment {experiment.id}: {str(e)}")
@@ -265,13 +258,12 @@ class ExperimentScheduler:
         try:
             for guardrail in experiment.guardrail_metrics:
                 metric_data = await self.experiment_service.get_metric_data(
-                    experiment_id=experiment.id,
-                    metric_name=guardrail.metric_name
+                    experiment_id=experiment.id, metric_name=guardrail.metric_name
                 )
-                
+
                 if self.is_guardrail_violated(metric_data, guardrail):
                     await self.handle_guardrail_violation(experiment, guardrail)
-                    
+
         except Exception as e:
             logger.error(f"Error checking guardrails for experiment {experiment.id}: {str(e)}")
 
@@ -280,46 +272,48 @@ class ExperimentScheduler:
         for variant_id, values in metric_data.items():
             if not values:
                 continue
-                
+
             metric_value = sum(values) / len(values)
-            
-            if guardrail.operator == 'gt' and metric_value > guardrail.threshold:
+
+            if guardrail.operator == "gt" and metric_value > guardrail.threshold:
                 return True
-            elif guardrail.operator == 'lt' and metric_value < guardrail.threshold:
+            elif guardrail.operator == "lt" and metric_value < guardrail.threshold:
                 return True
-            elif guardrail.operator == 'gte' and metric_value >= guardrail.threshold:
+            elif guardrail.operator == "gte" and metric_value >= guardrail.threshold:
                 return True
-            elif guardrail.operator == 'lte' and metric_value <= guardrail.threshold:
+            elif guardrail.operator == "lte" and metric_value <= guardrail.threshold:
                 return True
-                
+
         return False
 
     async def handle_guardrail_violation(self, experiment: Experiment, guardrail: GuardrailMetric):
         """Handle a guardrail violation"""
         await self.stop_experiment(experiment)
-        
+
         await self.experiment_service.record_event(
             experiment_id=experiment.id,
             event_data={
-                'event_type': 'guardrail_violation',
-                'metric_name': guardrail.metric_name,
-                'threshold': guardrail.threshold,
-                'operator': guardrail.operator
-            }
+                "event_type": "guardrail_violation",
+                "metric_name": guardrail.metric_name,
+                "threshold": guardrail.threshold,
+                "operator": guardrail.operator,
+            },
         )
-        
-        logger.warning(f"Guardrail violation in experiment {experiment.id}: {guardrail.metric_name}")
+
+        logger.warning(
+            f"Guardrail violation in experiment {experiment.id}: {guardrail.metric_name}"
+        )
 
     def schedule_automated_analysis(self, experiment: Experiment):
         """Schedule automated analysis for an experiment"""
-        interval = experiment.parameters.get('auto_analyze_interval')
+        interval = experiment.parameters.get("auto_analyze_interval")
         if not interval:
             return
-            
+
         async def run_periodic_analysis():
             while True:
                 await asyncio.sleep(interval)
                 await self.experiment_service.analyze_results(experiment.id)
-        
+
         task = asyncio.create_task(run_periodic_analysis())
         self.scheduled_tasks[experiment.id] = task

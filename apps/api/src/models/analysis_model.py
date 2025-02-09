@@ -16,22 +16,20 @@ class AnalysisConfig(BaseModel):
     correction_method: CorrectionMethod = Field(default=CorrectionMethod.NONE)
     sequential_testing: bool = Field(default=False)
     stopping_threshold: Optional[float] = Field(default=0.01, ge=0, le=1)
-    
+
     default_metric_config: MetricAnalysisConfig = Field(
-        default_factory=MetricAnalysisConfig,
-        description="Default configuration for all metrics"
+        default_factory=MetricAnalysisConfig, description="Default configuration for all metrics"
     )
-    
+
     metric_configs: Dict[str, MetricAnalysisConfig] = Field(
-        default_factory=dict,
-        description="Metric-specific configurations that override defaults"
+        default_factory=dict, description="Metric-specific configurations that override defaults"
     )
-    
+
     prior_successes: Optional[int] = Field(default=30, ge=0)
     prior_trials: Optional[int] = Field(default=100, ge=0)
     num_samples: Optional[int] = Field(default=10000, ge=1000)
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_bayesian_params(self):
         if self.method == AnalysisMethod.BAYESIAN:
             if self.prior_successes is None or self.prior_trials is None:
@@ -60,4 +58,4 @@ class MetricResult(BaseModel):
 class AnalysisResults(BaseModel):
     experiment_id: str
     metrics: Dict[str, Dict[str, MetricResult]]  # metric_name -> variant_id -> result
-    guardrail_violations: Optional[Dict[str, Any]] = None 
+    guardrail_violations: Optional[Dict[str, Any]] = None

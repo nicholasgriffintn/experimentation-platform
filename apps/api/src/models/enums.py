@@ -38,6 +38,7 @@ class CorrectionMethod(str, Enum):
     FDR_BH = "fdr_bh"
     HOLM = "holm"
 
+
 class GuardrailOperator(str, Enum):
     GREATER_THAN = "gt"
     LESS_THAN = "lt"

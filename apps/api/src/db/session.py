@@ -5,11 +5,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from ..config.app import settings
 
-engine = create_engine(
-    settings.database_url,
-    pool_pre_ping=True,
-    echo=settings.debug_mode
-)
+engine = create_engine(settings.database_url, pool_pre_ping=True, echo=settings.debug_mode)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -17,7 +13,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def get_db() -> Generator[Session, None, None]:
     """
     Get a database session.
-    
+
     Yields:
         Session: SQLAlchemy database session
     """
@@ -25,4 +21,4 @@ def get_db() -> Generator[Session, None, None]:
     try:
         yield db
     finally:
-        db.close() 
+        db.close()

@@ -2,11 +2,13 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
-from ...models.metrics import MetricType
+from ...models.metrics_model import MetricType
 
 
 class BayesianAnalysisService:
-    def __init__(self, prior_successes: int = 30, prior_trials: int = 100, num_samples: int = 10000):
+    def __init__(
+        self, prior_successes: int = 30, prior_trials: int = 100, num_samples: int = 10000
+    ):
         self.prior_successes = prior_successes
         self.prior_trials = prior_trials
         self.num_samples = num_samples
@@ -25,12 +27,12 @@ class BayesianAnalysisService:
         control_posterior = np.random.beta(
             control_success + self.prior_successes,
             control_trials - control_success + self.prior_trials - self.prior_successes,
-            size=self.num_samples
+            size=self.num_samples,
         )
         variant_posterior = np.random.beta(
             variant_success + self.prior_successes,
             variant_trials - variant_success + self.prior_trials - self.prior_successes,
-            size=self.num_samples
+            size=self.num_samples,
         )
 
         prob_improvement = np.mean(variant_posterior > control_posterior)
@@ -45,10 +47,7 @@ class BayesianAnalysisService:
             "credible_interval": tuple(credible_interval),
             "control_rate": float(np.mean(control_posterior)),
             "variant_rate": float(np.mean(variant_posterior)),
-            "sample_size": {
-                "control": control_trials,
-                "variant": variant_trials
-            }
+            "sample_size": {"control": control_trials, "variant": variant_trials},
         }
 
     def analyze_continuous_metric(
@@ -63,14 +62,10 @@ class BayesianAnalysisService:
         variant_std = np.std(variant_data, ddof=1)
 
         control_posterior = np.random.normal(
-            control_mean,
-            control_std / np.sqrt(len(control_data)),
-            size=self.num_samples
+            control_mean, control_std / np.sqrt(len(control_data)), size=self.num_samples
         )
         variant_posterior = np.random.normal(
-            variant_mean,
-            variant_std / np.sqrt(len(variant_data)),
-            size=self.num_samples
+            variant_mean, variant_std / np.sqrt(len(variant_data)), size=self.num_samples
         )
 
         prob_improvement = np.mean(variant_posterior > control_posterior)
@@ -85,10 +80,7 @@ class BayesianAnalysisService:
             "credible_interval": tuple(credible_interval),
             "control_mean": float(control_mean),
             "variant_mean": float(variant_mean),
-            "sample_size": {
-                "control": len(control_data),
-                "variant": len(variant_data)
-            }
+            "sample_size": {"control": len(control_data), "variant": len(variant_data)},
         }
 
     def _check_sequential_stopping(
@@ -96,7 +88,7 @@ class BayesianAnalysisService:
         control_data: List[float],
         variant_data: List[float],
         metric_type: MetricType,
-        stopping_threshold: float
+        stopping_threshold: float,
     ) -> Tuple[bool, Dict[str, Any]]:
         """Check if sequential testing should stop early using Bayesian criteria"""
         if metric_type == MetricType.BINARY:
@@ -105,15 +97,16 @@ class BayesianAnalysisService:
             results = self.analyze_continuous_metric(control_data, variant_data)
 
         prob_improvement = results["probability_of_improvement"]
-        
-        should_stop = (prob_improvement > (1 - stopping_threshold) or 
-                      prob_improvement < stopping_threshold)
-        
+
+        should_stop = (
+            prob_improvement > (1 - stopping_threshold) or prob_improvement < stopping_threshold
+        )
+
         return should_stop, {
             "probability_of_improvement": prob_improvement,
             "expected_lift": results["expected_lift"],
             "control_mean": results.get("control_mean", results.get("control_rate")),
-            "variant_mean": results.get("variant_mean", results.get("variant_rate"))
+            "variant_mean": results.get("variant_mean", results.get("variant_rate")),
         }
 
     def analyze_experiment(
@@ -123,7 +116,7 @@ class BayesianAnalysisService:
         metric_type: MetricType,
         metric_name: str,
         sequential: bool = False,
-        stopping_threshold: float = 0.01
+        stopping_threshold: float = 0.01,
     ) -> Dict[str, Any]:
         """Perform Bayesian analysis based on metric type with optional sequential testing"""
         if sequential and stopping_threshold is not None:
@@ -138,12 +131,9 @@ class BayesianAnalysisService:
                     "relative_difference": early_results["expected_lift"],
                     "p_value": 1 - early_results["probability_of_improvement"],
                     "confidence_interval": (-np.inf, np.inf),  # Not applicable for early stopping
-                    "sample_size": {
-                        "control": len(control_data),
-                        "variant": len(variant_data)
-                    },
+                    "sample_size": {"control": len(control_data), "variant": len(variant_data)},
                     "power": early_results["probability_of_improvement"],
-                    "is_significant": early_results["probability_of_improvement"] > 0.95
+                    "is_significant": early_results["probability_of_improvement"] > 0.95,
                 }
 
         if metric_type == MetricType.BINARY:
@@ -155,12 +145,16 @@ class BayesianAnalysisService:
 
         return {
             "metric_name": metric_name,
-            "control_mean": results["control_mean"] if "control_mean" in results else results["control_rate"],
-            "variant_mean": results["variant_mean"] if "variant_mean" in results else results["variant_rate"],
+            "control_mean": (
+                results["control_mean"] if "control_mean" in results else results["control_rate"]
+            ),
+            "variant_mean": (
+                results["variant_mean"] if "variant_mean" in results else results["variant_rate"]
+            ),
             "relative_difference": results["expected_lift"],
             "p_value": 1 - results["probability_of_improvement"],
             "confidence_interval": results["credible_interval"],
             "sample_size": results["sample_size"],
             "power": results["probability_of_improvement"],
-            "is_significant": results["probability_of_improvement"] > 0.95
-        } 
+            "is_significant": results["probability_of_improvement"] > 0.95,
+        }

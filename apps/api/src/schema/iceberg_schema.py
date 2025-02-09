@@ -21,10 +21,7 @@ class IcebergSchemas:
             Schema.NestedField.required(6, "event_type", StringType()),
             Schema.NestedField.optional(7, "event_value", DoubleType()),
             Schema.NestedField.optional(8, "client_id", StringType()),
-            Schema.NestedField.optional(9, "metadata", MapType(
-                StringType(),
-                StringType()
-            ))
+            Schema.NestedField.optional(9, "metadata", MapType(StringType(), StringType())),
         )
 
     @staticmethod
@@ -38,10 +35,7 @@ class IcebergSchemas:
             Schema.NestedField.required(5, "metric_name", StringType()),
             Schema.NestedField.required(6, "metric_value", DoubleType()),
             Schema.NestedField.optional(7, "segment", StringType()),
-            Schema.NestedField.optional(8, "metadata", MapType(
-                StringType(),
-                StringType()
-            ))
+            Schema.NestedField.optional(8, "metadata", MapType(StringType(), StringType())),
         )
 
     @staticmethod
@@ -53,10 +47,7 @@ class IcebergSchemas:
             Schema.NestedField.required(3, "user_id", StringType()),
             Schema.NestedField.required(4, "variant_id", StringType()),
             Schema.NestedField.required(5, "timestamp", TimestampType()),
-            Schema.NestedField.optional(6, "context", MapType(
-                StringType(),
-                StringType()
-            ))
+            Schema.NestedField.optional(6, "context", MapType(StringType(), StringType())),
         )
 
     @staticmethod
@@ -73,8 +64,5 @@ class IcebergSchemas:
             Schema.NestedField.required(8, "variance", DoubleType()),
             Schema.NestedField.optional(9, "confidence_level", DoubleType()),
             Schema.NestedField.optional(10, "p_value", DoubleType()),
-            Schema.NestedField.optional(11, "metadata", MapType(
-                StringType(),
-                StringType()
-            ))
+            Schema.NestedField.optional(11, "metadata", MapType(StringType(), StringType())),
         )

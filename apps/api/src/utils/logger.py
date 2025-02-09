@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 class LogConfig(BaseModel):
     """Logging configuration"""
-    
+
     LOGGER_NAME: str = "experimentation"
     LOG_FORMAT: str = "%(levelprefix)s | %(asctime)s | %(message)s"
     LOG_LEVEL: str = "DEBUG"
@@ -51,9 +51,10 @@ class LogConfig(BaseModel):
         },
     }
 
+
 class JSONFormatter(logging.Formatter):
     """JSON log formatter"""
-    
+
     def format(self, record: logging.LogRecord) -> str:
         log_data = {
             "timestamp": self.formatTime(record, self.datefmt),
@@ -61,17 +62,18 @@ class JSONFormatter(logging.Formatter):
             "message": record.getMessage(),
             "logger": record.name,
         }
-        
+
         if hasattr(record, "experiment_id"):
             log_data["experiment_id"] = record.experiment_id
-            
+
         if hasattr(record, "metric_name"):
             log_data["metric_name"] = record.metric_name
-            
+
         if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)
-            
+
         return json.dumps(log_data)
+
 
 Path("logs").mkdir(exist_ok=True)
 
