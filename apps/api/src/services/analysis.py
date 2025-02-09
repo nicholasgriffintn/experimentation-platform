@@ -25,9 +25,34 @@ class ExperimentResult:
 class StatisticalAnalysisService:
     # TODO: This is a simple implementation for now, I'll work on this over time.
     def __init__(self, min_sample_size: int = 100, confidence_level: float = 0.95):
+        if not 0 < confidence_level < 1:
+            raise ValueError("Confidence level must be between 0 and 1")
+        if min_sample_size < 1:
+            raise ValueError("Minimum sample size must be positive")
+            
         self.min_sample_size = min_sample_size
         self.confidence_level = confidence_level
         self.alpha = 1 - confidence_level
+
+    def _validate_input_data(self, control_data: List[float], variant_data: List[float], metric_type: MetricType):
+        """Validate input data based on metric type and requirements"""
+        if not control_data or not variant_data:
+            raise ValueError("Control and variant data cannot be empty")
+            
+        if len(control_data) < self.min_sample_size or len(variant_data) < self.min_sample_size:
+            raise ValueError(f"Insufficient sample size. Minimum required: {self.min_sample_size}")
+
+        if metric_type == MetricType.BINARY:
+            if not all(x in (0, 1) for x in control_data + variant_data):
+                raise ValueError("Binary metrics must contain only 0s and 1s")
+                
+        if metric_type == MetricType.COUNT:
+            if not all(isinstance(x, (int, np.integer)) and x >= 0 for x in control_data + variant_data):
+                raise ValueError("Count metrics must contain non-negative integers")
+                
+        if metric_type == MetricType.RATIO:
+            if not all(0 <= x <= 1 for x in control_data + variant_data):
+                raise ValueError("Ratio metrics must contain values between 0 and 1")
 
     async def analyze_experiment(
         self,
@@ -37,10 +62,8 @@ class StatisticalAnalysisService:
         metric_name: str
     ) -> ExperimentResult:
         """Perform statistical analysis on experiment data"""
+        self._validate_input_data(control_data, variant_data, metric_type)
         
-        if len(control_data) < self.min_sample_size or len(variant_data) < self.min_sample_size:
-            raise ValueError(f"Insufficient sample size. Minimum required: {self.min_sample_size}")
-
         control_mean = np.mean(control_data)
         variant_mean = np.mean(variant_data)
         relative_diff = ((variant_mean - control_mean) / control_mean) * 100
@@ -48,6 +71,12 @@ class StatisticalAnalysisService:
         if metric_type == MetricType.BINARY:
             p_value = self._calculate_binary_significance(control_data, variant_data)
             ci = self._calculate_binary_confidence_interval(control_data, variant_data)
+        elif metric_type == MetricType.COUNT:
+            _, p_value = stats.mannwhitneyu(control_data, variant_data, alternative='two-sided')
+            ci = self._calculate_continuous_confidence_interval(control_data, variant_data)
+        elif metric_type == MetricType.RATIO:
+            t_stat, p_value = stats.ttest_ind(control_data, variant_data)
+            ci = self._calculate_ratio_confidence_interval(control_data, variant_data)
         else:
             t_stat, p_value = stats.ttest_ind(control_data, variant_data)
             ci = self._calculate_continuous_confidence_interval(control_data, variant_data)
@@ -142,6 +171,38 @@ class StatisticalAnalysisService:
         pooled_sd = np.sqrt(((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2))
         
         return abs(np.mean(control_data) - np.mean(variant_data)) / pooled_sd
+
+    def _calculate_ratio_confidence_interval(
+        self,
+        control_data: List[float],
+        variant_data: List[float]
+    ) -> Tuple[float, float]:
+        """Calculate confidence interval for ratio metrics, ensuring bounds are [0,1]"""
+        ci_low, ci_high = self._calculate_continuous_confidence_interval(control_data, variant_data)
+        return (max(0.0, ci_low), min(1.0, ci_high))
+
+    def get_recommended_duration(
+        self,
+        daily_samples: int,
+        required_sample_size: int
+    ) -> int:
+        """Calculate recommended experiment duration in days"""
+        return int(np.ceil(required_sample_size / daily_samples))
+
+    def estimate_mde(
+        self,
+        baseline_rate: float,
+        sample_size: int,
+        power: float = 0.8
+    ) -> float:
+        """Estimate minimum detectable effect given a sample size"""
+        analysis = stats.power.TTestIndPower()
+        effect_size = analysis.solve_effect_size(
+            nobs=sample_size,
+            alpha=self.alpha,
+            power=power
+        )
+        return effect_size * np.sqrt(baseline_rate * (1 - baseline_rate))
 
     async def calculate_sample_size(
         self,

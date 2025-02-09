@@ -162,11 +162,33 @@ class ExperimentScheduler:
             print(f"Error checking auto-stop conditions for experiment {experiment.id}: {str(e)}")
 
     async def _get_experiment_sample_size(self, experiment: Experiment) -> int:
-        """Get the current sample size of the experiment"""
+        """
+        Get the current sample size of the experiment.
+        Returns the size of the smallest variant group (control or treatment)
+        to ensure we have sufficient data across all variants.
+        """
         try:
-            # TODO: Implement actual sample size calculation
             exposure_data = await self.experiment_service.data_service.get_exposure_data(experiment.id)
-            return len(exposure_data)
+            if not exposure_data:
+                return 0
+
+            variant_sizes = {}
+            for record in exposure_data:
+                variant_id = record.get('variant_id')
+                user_id = record.get('user_id')
+                
+                if not variant_id or not user_id:
+                    continue
+                    
+                if variant_id not in variant_sizes:
+                    variant_sizes[variant_id] = set()
+                variant_sizes[variant_id].add(user_id)
+            
+            if not variant_sizes:
+                return 0
+            
+            return min(len(users) for users in variant_sizes.values())
+            
         except Exception as e:
             print(f"Error getting sample size for experiment {experiment.id}: {str(e)}")
             return 0
