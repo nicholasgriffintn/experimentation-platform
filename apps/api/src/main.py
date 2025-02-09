@@ -8,6 +8,7 @@ from .dependencies import get_db, get_experiment_service
 from .db.base import Base
 from .db.session import engine
 from .services.scheduler import ExperimentScheduler
+from .db.seed import seed_all
 
 description = """
 This API provides a comprehensive suite of endpoints for managing and analyzing experiments and feature flags.
@@ -74,6 +75,8 @@ async def startup_event():
         asyncio.create_task(scheduler.start())
     else:
         print("Scheduler is disabled")
+
+    seed_all(db)
 
 @app.on_event("shutdown")
 async def shutdown_event():

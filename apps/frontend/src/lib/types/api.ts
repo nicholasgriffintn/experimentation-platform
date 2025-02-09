@@ -105,4 +105,11 @@ export interface ExperimentResults {
     experiment_id: string;
     metrics: MetricResult[];
     last_updated: string;
+}
+
+export interface FeatureDefinition {
+    name: string;
+    description: string;
+    data_type: string;
+    possible_values: any[];
 } 

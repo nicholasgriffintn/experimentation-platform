@@ -1,7 +1,8 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { metrics as metricsStore, metricActions } from '$lib/stores/metrics';
-    import type { ExperimentType, VariantType, Variant, ExperimentCreate, ExperimentSchedule, GuardrailConfig, GuardrailOperator, AnalysisConfig } from '$lib/types/api';
+    import { features as featuresStore, featureActions } from '$lib/stores/features';
+    import type { ExperimentType, VariantType, Variant, ExperimentCreate, ExperimentSchedule, GuardrailConfig, GuardrailOperator, AnalysisConfig, FeatureDefinition } from '$lib/types/api';
     import { createEventDispatcher } from 'svelte';
     import { formatDateToISO } from '$lib/utils/date';
 
@@ -37,6 +38,9 @@
         metric_configs: {},
         ...experiment.analysis_config
     };
+
+    let selectedFeature: FeatureDefinition | null = null;
+    let selectedFeatureName = '';
 
     function getBayesianValue(value: number | undefined, defaultValue: number): number {
         return value ?? defaultValue;
@@ -75,6 +79,9 @@
     onMount(() => {
         if (!$metricsStore.length) {
             metricActions.loadMetrics();
+        }
+        if (!$featuresStore.length) {
+            featureActions.loadFeatures();
         }
     });
 
@@ -136,9 +143,10 @@
         return null;
     }
 
-    function updateVariantConfig(index: number, key: string, value: string) {
+    function updateVariantConfig(index: number, key: string, event: Event) {
+        const input = event.target as HTMLInputElement;
         const variant = variants[index];
-        const updatedConfig = { ...variant.config, [key]: value };
+        const updatedConfig = { ...variant.config, [key]: input.value };
         variants[index] = { ...variant, config: updatedConfig };
         variants = [...variants];
     }
@@ -153,7 +161,10 @@
     function addConfigKey(variantIndex: number) {
         const key = prompt('Enter config key:');
         if (key && !variants[variantIndex].config[key]) {
-            updateVariantConfig(variantIndex, key, '');
+            const variant = variants[variantIndex];
+            const updatedConfig = { ...variant.config, [key]: '' };
+            variants[variantIndex] = { ...variant, config: updatedConfig };
+            variants = [...variants];
         }
     }
 
@@ -218,6 +229,23 @@
     $: showBayesianError = analysis_config.method === 'bayesian' && 
         getBayesianValue(analysis_config.prior_successes, 0) > 
         getBayesianValue(analysis_config.prior_trials, 100);
+
+    function handleFeatureSelect(event: Event) {
+        const select = event.target as HTMLSelectElement;
+        const feature = $featuresStore.find(f => f.name === select.value);
+        if (!feature) return;
+        
+        selectedFeature = feature;
+        selectedFeatureName = feature.name;
+        parameters = { ...parameters, feature_name: feature.name };
+        
+        if (feature.possible_values.length >= 2) {
+            variants = [
+                createVariant('Control', 'feature_flag', { value: feature.possible_values[0] }, 50),
+                createVariant('Treatment', 'feature_flag', { value: feature.possible_values[1] }, 50)
+            ];
+        }
+    }
 </script>
 
 <form on:submit|preventDefault={handleSubmit} class="space-y-6">
@@ -387,76 +415,73 @@
 
         <div class="space-y-4">
             {#each variants as variant, i}
-                <div class="p-4 border rounded-md">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="space-y-2 flex-1 mr-4">
-                            <input
-                                type="text"
-                                bind:value={variant.name}
-                                placeholder="Variant name"
-                                disabled={loading}
-                                class="w-full px-3 py-2 border rounded-md"
-                            />
-                        </div>
-                        <div class="space-y-2 w-32">
-                            <input
-                                type="number"
-                                bind:value={variant.traffic_percentage}
-                                min="0"
-                                max="100"
-                                disabled={loading}
-                                class="w-full px-3 py-2 border rounded-md"
-                            />
-                        </div>
-                        {#if i > 0}
+                <div class="p-4 border rounded-md space-y-2">
+                    <div class="flex items-center justify-between">
+                        <h4 class="font-medium">{variant.name}</h4>
+                        {#if variants.length > 2}
                             <button
                                 type="button"
                                 on:click={() => removeVariant(i)}
-                                disabled={loading}
-                                class="ml-2 px-2 py-1 text-red-600 hover:bg-red-50 rounded"
+                                class="text-red-600 hover:text-red-800"
                             >
                                 Remove
                             </button>
                         {/if}
                     </div>
 
-                    <div class="space-y-2">
-                        <div class="flex justify-between items-center mb-2">
-                            <h4 class="font-medium">Configuration</h4>
+                    {#if type === 'feature_flag' && selectedFeature}
+                        <div class="space-y-2">
+                            <label for={`variant-${i}-value`} class="block text-sm font-medium">Value</label>
+                            <select
+                                id={`variant-${i}-value`}
+                                bind:value={variant.config.value}
+                                class="w-full px-3 py-2 border rounded-md"
+                            >
+                                {#each selectedFeature.possible_values as value}
+                                    <option value={value}>{value}</option>
+                                {/each}
+                            </select>
+                        </div>
+                    {:else}
+                        <div class="space-y-2">
+                            {#each Object.entries(variant.config) as [key, value]}
+                                <div class="flex items-center space-x-2">
+                                    <input
+                                        type="text"
+                                        value={value}
+                                        on:input={(event) => updateVariantConfig(i, key, event)}
+                                        class="flex-grow px-3 py-2 border rounded-md"
+                                    />
+                                    <button
+                                        type="button"
+                                        on:click={() => removeConfigKey(i, key)}
+                                        class="text-red-600 hover:text-red-800"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            {/each}
                             <button
                                 type="button"
                                 on:click={() => addConfigKey(i)}
-                                disabled={loading}
-                                class="text-sm text-blue-600 hover:bg-blue-50 px-2 py-1 rounded"
+                                class="text-blue-600 hover:text-blue-800"
                             >
                                 Add Config
                             </button>
                         </div>
-                        {#each Object.entries(variant.config) as [key, value]}
-                            <div class="flex space-x-2">
-                                <input
-                                    type="text"
-                                    value={key}
-                                    readonly
-                                    class="flex-1 px-3 py-2 border rounded-md bg-gray-50"
-                                />
-                                <input
-                                    type="text"
-                                    value={value}
-                                    on:input={(e) => updateVariantConfig(i, key, e.currentTarget.value)}
-                                    disabled={loading}
-                                    class="flex-1 px-3 py-2 border rounded-md"
-                                />
-                                <button
-                                    type="button"
-                                    on:click={() => removeConfigKey(i, key)}
-                                    disabled={loading}
-                                    class="px-2 py-1 text-red-600 hover:bg-red-50 rounded"
-                                >
-                                    Remove
-                                </button>
-                            </div>
-                        {/each}
+                    {/if}
+
+                    <div class="space-y-2">
+                        <label for={`variant-${i}-traffic`} class="block text-sm font-medium">Traffic %</label>
+                        <input
+                            id={`variant-${i}-traffic`}
+                            type="number"
+                            bind:value={variant.traffic_percentage}
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            class="w-full px-3 py-2 border rounded-md"
+                        />
                     </div>
                 </div>
             {/each}
@@ -659,19 +684,51 @@
         {/if}
     </div>
 
+    {#if type === 'feature_flag'}
+        <div class="space-y-4">
+            <h3 class="text-lg font-semibold">Feature Configuration</h3>
+            
+            <div class="space-y-2">
+                <label for="feature" class="block text-sm font-medium">Select Feature</label>
+                <select
+                    id="feature"
+                    value={selectedFeature?.name ?? ''}
+                    on:change={handleFeatureSelect}
+                    required
+                    disabled={loading}
+                    class="w-full px-3 py-2 border rounded-md"
+                >
+                    <option value="">Select a feature...</option>
+                    {#each $featuresStore as feature}
+                        <option value={feature.name}>{feature.name} - {feature.description}</option>
+                    {/each}
+                </select>
+            </div>
+
+            {#if selectedFeature}
+                <div class="space-y-2">
+                    <p class="text-sm text-gray-600">
+                        Data Type: {selectedFeature.data_type}<br>
+                        Possible Values: {selectedFeature.possible_values.join(', ')}
+                    </p>
+                </div>
+            {/if}
+        </div>
+    {/if}
+
     <div class="flex justify-end space-x-3">
         <button
             type="button"
             on:click={() => dispatch('cancel')}
             disabled={loading}
-            class="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+            class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md"
         >
             Cancel
         </button>
         <button
             type="submit"
             disabled={loading}
-            class="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
+            class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md"
         >
             {#if loading}
                 <span class="inline-block animate-spin mr-2">⌛</span>

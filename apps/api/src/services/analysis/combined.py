@@ -16,10 +16,15 @@ class CombinedAnalysisResult:
 class CombinedAnalysisService:
     """Service that combines frequentist and Bayesian analysis approaches"""
     
-    def __init__(self):
-        self.frequentist_service = StatisticalAnalysisService()
-        self.bayesian_service = BayesianAnalysisService()
-        self.correction_service = MultipleTestingCorrection()
+    def __init__(
+        self,
+        frequentist_service: StatisticalAnalysisService,
+        bayesian_service: BayesianAnalysisService,
+        correction_service: MultipleTestingCorrection
+    ):
+        self.frequentist_service = frequentist_service
+        self.bayesian_service = bayesian_service
+        self.correction_service = correction_service
         
     def analyze_experiment(
         self,

@@ -15,13 +15,15 @@ from ..models.experiment import (
     MetricEvent,
     ExperimentSchedule,
     ExperimentStatus,
+    ExperimentType,
 )
 from ..db.base import (
     Experiment as DBExperiment,
     MetricDefinition as DBMetricDefinition,
     ExperimentMetric as DBExperimentMetric,
     Variant as DBVariant,
-    GuardrailMetric as DBGuardrailMetric
+    GuardrailMetric as DBGuardrailMetric,
+    FeatureDefinition as DBFeatureDefinition
 )
 from ..dependencies import get_experiment_service
 
@@ -68,7 +70,7 @@ async def create_experiment(
         ExperimentModel: The created experiment object
 
     Raises:
-        HTTPException: 400 if invalid metrics are specified
+        HTTPException: 400 if invalid metrics are specified or feature validation fails
     """
     for metric_name in experiment.metrics:
         if not await validate_metric(metric_name, db):
@@ -76,6 +78,8 @@ async def create_experiment(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid metric: {metric_name}"
             )
+    
+    await validate_feature_flag_experiment(experiment, db)
     
     db_experiment = create_experiment_in_db(experiment, db)
     
@@ -605,3 +609,45 @@ def create_experiment_in_db(experiment: ExperimentCreate, db: Session) -> DBExpe
     db.commit()
     db.refresh(db_experiment)
     return db_experiment
+
+async def validate_feature_flag_experiment(experiment: ExperimentCreate, db: Session):
+    """
+    Validate feature flag experiment configuration against defined features.
+    
+    Args:
+        experiment: The experiment configuration
+        db: Database session
+        
+    Raises:
+        HTTPException: If feature validation fails
+    """
+    if experiment.type != ExperimentType.FEATURE_FLAG:
+        return
+
+    feature_name = experiment.parameters.get('feature_name')
+    if not feature_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Feature flag experiments must specify feature_name in parameters"
+        )
+
+    feature = db.query(DBFeatureDefinition).filter(DBFeatureDefinition.name == feature_name).first()
+    if not feature:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Feature {feature_name} is not defined. Create it first using the features API."
+        )
+
+    for variant in experiment.variants:
+        config_value = variant.config.get('value')
+        if config_value is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Variant {variant.name} must specify a 'value' in config"
+            )
+        
+        if config_value not in feature.possible_values:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Value {config_value} for variant {variant.name} is not in allowed values for feature {feature_name}: {feature.possible_values}"
+            )
