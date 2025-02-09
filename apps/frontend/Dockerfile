@@ -1,21 +1,22 @@
 FROM node:20-slim
 
-# Set working directory to frontend app from the start
-WORKDIR /app/apps/frontend
+WORKDIR /app
 
 # Install pnpm
 RUN npm install -g pnpm
 
-# Copy package files
-COPY package.json pnpm-workspace.yaml /app/
-COPY apps/frontend/package.json ./
+# Copy package files for workspace
+COPY package.json pnpm-workspace.yaml ./
+COPY apps/frontend/package.json ./apps/frontend/
 
-# Install workspace dependencies
-WORKDIR /app
+# Install dependencies
 RUN pnpm install --no-frozen-lockfile
 
 # Copy frontend code
-COPY apps/frontend /app/apps/frontend
+COPY apps/frontend ./apps/frontend
+
+# Set working directory to frontend app
+WORKDIR /app/apps/frontend
 
 # Start development server
 CMD ["pnpm", "dev", "--host"] 
