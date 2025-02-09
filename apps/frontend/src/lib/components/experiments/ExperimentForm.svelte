@@ -1,8 +1,9 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { metrics as metricsStore, metricActions } from '$lib/stores/metrics';
-    import type { ExperimentCreate, Variant, ExperimentSchedule } from '$lib/types/api';
+    import type { ExperimentType, VariantType, Variant, ExperimentCreate, ExperimentSchedule } from '$lib/types/api';
     import { createEventDispatcher } from 'svelte';
+    import { formatDateToISO } from '$lib/utils/date';
 
     export let experiment: Partial<ExperimentCreate> = {};
     export let submitLabel = 'Create Experiment';
@@ -13,21 +14,44 @@
         cancel: void;
     }>();
 
+    let error: string | null = null;
     let name = experiment.name ?? '';
     let description = experiment.description ?? '';
-    let type = experiment.type ?? 'ab_test';
+    let type = (experiment.type ?? 'ab_test') as ExperimentType;
     let hypothesis = experiment.hypothesis ?? '';
     let metrics = experiment.metrics ?? [];
-    let variants: Omit<Variant, 'id'>[] = experiment.variants ?? [
-        { name: 'control', type: 'control', config: {}, traffic_percentage: 50 },
-        { name: 'variant', type: 'treatment', config: {}, traffic_percentage: 50 }
-    ];
     let targeting_rules: Record<string, any> = experiment.targeting_rules ?? {};
     let schedule: Partial<ExperimentSchedule> = experiment.schedule ?? {};
     let parameters: Record<string, any> = experiment.parameters ?? {};
 
     const experimentTypes = ['ab_test', 'multivariate', 'feature_flag'];
-    const variantTypes = ['control', 'treatment', 'feature_flag'];
+
+    $: {
+        if (type === 'ab_test') {
+            variants = [
+                createVariant('Control', 'control', {}, 50),
+                createVariant('Treatment', 'treatment', {}, 50)
+            ];
+        } else if (type === 'feature_flag') {
+            variants = [
+                createVariant('Off', 'feature_flag', { enabled: false }, 50),
+                createVariant('On', 'feature_flag', { enabled: true }, 50)
+            ];
+        } else if (type === 'multivariate') {
+            if (variants.length < 2) {
+                variants = [
+                    createVariant('Control', 'control', {}, 50),
+                    createVariant('Treatment A', 'treatment', {}, 50)
+                ];
+            } else {
+                variants = variants.map((v, i) => ({
+                    ...v,
+                    type: i === 0 ? 'control' as const : 'treatment' as const,
+                    name: i === 0 ? 'Control' : `Treatment ${String.fromCharCode(65 + i - 1)}`
+                }));
+            }
+        }
+    }
 
     onMount(() => {
         if (!$metricsStore.length) {
@@ -35,16 +59,32 @@
         }
     });
 
+    function createVariant(name: string, type: VariantType, config = {}, traffic_percentage: number): Variant {
+        return {
+            id: crypto.randomUUID(),
+            name,
+            type,
+            config,
+            traffic_percentage
+        };
+    }
+
+    let variants: Variant[] = experiment.variants?.map(v => ({
+        ...v,
+        id: crypto.randomUUID()
+    })) ?? [
+        createVariant('Control', 'control', {}, 50),
+        createVariant('Treatment', 'treatment', {}, 50)
+    ];
+
     function addVariant() {
-        variants = [
-            ...variants,
-            { 
-                name: `variant_${variants.length}`, 
-                type: 'treatment',
-                config: {}, 
-                traffic_percentage: 0 
-            }
-        ];
+        const newVariant = createVariant(
+            `Treatment ${variants.length}`,
+            type === 'feature_flag' ? 'feature_flag' : 'treatment',
+            {},
+            0
+        );
+        variants = [...variants, newVariant];
         rebalanceTraffic();
     }
 
@@ -54,13 +94,27 @@
     }
 
     function rebalanceTraffic() {
-        const equalShare = Math.floor(100 / variants.length);
-        const remainder = 100 - (equalShare * variants.length);
-        
-        variants = variants.map((variant, index) => ({
-            ...variant,
-            traffic_percentage: equalShare + (index === 0 ? remainder : 0)
-        }));
+        const equalShare = 100 / variants.length;
+        variants = variants.map(v => ({ ...v, traffic_percentage: equalShare }));
+    }
+
+    function validateVariants(): string | null {
+        if (type === 'ab_test') {
+            if (variants.length !== 2) return 'A/B tests must have exactly two variants';
+            if (variants[0].type !== 'control') return 'First variant must be control';
+            if (variants[1].type !== 'treatment') return 'Second variant must be treatment';
+        } else if (type === 'multivariate') {
+            if (variants.length < 2) return 'Multivariate tests must have at least two variants';
+            if (variants[0].type !== 'control') return 'First variant must be control';
+            if (!variants.slice(1).every(v => v.type === 'treatment')) {
+                return 'All non-control variants must be treatment variants';
+            }
+        } else if (type === 'feature_flag') {
+            if (!variants.every(v => v.type === 'feature_flag')) {
+                return 'Feature flags must have all variants of type feature_flag';
+            }
+        }
+        return null;
     }
 
     function updateVariantConfig(index: number, key: string, value: string) {
@@ -84,12 +138,12 @@
         }
     }
 
-    function formatDateToISO(dateStr: string): string {
-        if (!dateStr) return '';
-        return `${dateStr}:00Z`;
-    }
-
     function handleSubmit() {
+        const variantError = validateVariants();
+        if (variantError) {
+            error = variantError;
+            return;
+        }
         const finalSchedule = schedule.start_time ? {
             start_time: formatDateToISO(schedule.start_time),
             end_time: schedule.end_time ? formatDateToISO(schedule.end_time) : undefined,

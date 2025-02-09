@@ -14,10 +14,13 @@ export interface MetricDefinition {
     min_effect_size?: number;
 }
 
+export type ExperimentType = 'ab_test' | 'multivariate' | 'feature_flag';
+export type VariantType = 'control' | 'treatment' | 'feature_flag';
+
 export interface Variant {
     id: string;
     name: string;
-    type: 'control' | 'treatment' | 'feature_flag';
+    type: VariantType;
     config: Record<string, any>;
     traffic_percentage: number;
 }
@@ -32,7 +35,7 @@ export interface ExperimentSchedule {
 export interface ExperimentCreate {
     name: string;
     description: string;
-    type: 'ab_test' | 'multivariate' | 'feature_flag';
+    type: ExperimentType;
     hypothesis?: string;
     metrics: string[];
     variants: Omit<Variant, 'id'>[];
