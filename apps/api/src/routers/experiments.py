@@ -550,7 +550,7 @@ def is_valid_experiment_metric(experiment_id: str, metric_name: str, db: Session
 def create_experiment_in_db(experiment: ExperimentCreate, db: Session) -> DBExperiment:
     """Create a new experiment in the database"""
     experiment_data = experiment.dict(
-        exclude={"variants", "metrics", "guardrail_metrics", "metrics", "schedule"}
+        exclude={"variants", "metrics", "guardrail_metrics", "metrics", "schedule", "analysis_config"}
     )
 
     experiment_data["id"] = str(uuid4())
@@ -572,10 +572,14 @@ def create_experiment_in_db(experiment: ExperimentCreate, db: Session) -> DBExpe
         experiment_data["correction_method"] = experiment.analysis_config.correction_method
         experiment_data["sequential_testing"] = experiment.analysis_config.sequential_testing
         experiment_data["stopping_threshold"] = experiment.analysis_config.stopping_threshold
-        experiment_data["min_sample_size"] = experiment.analysis_config.min_sample_size
         experiment_data["prior_successes"] = experiment.analysis_config.prior_successes
         experiment_data["prior_trials"] = experiment.analysis_config.prior_trials
         experiment_data["num_samples"] = experiment.analysis_config.num_samples
+        if experiment.analysis_config.default_metric_config:
+            experiment_data["default_metric_config"] = {
+                "min_effect_size": experiment.analysis_config.default_metric_config.min_effect_size,
+                "min_sample_size": experiment.analysis_config.default_metric_config.min_sample_size
+            }
 
     db_experiment = DBExperiment(**experiment_data)
     db.add(db_experiment)
