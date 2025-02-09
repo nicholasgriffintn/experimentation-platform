@@ -34,7 +34,9 @@ class Experiment(Base):
     auto_stop_conditions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     traffic_allocation: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
     started_at: Mapped[datetime | None] = mapped_column(DateTime)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime)
     stopped_reason: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -59,8 +61,12 @@ class Experiment(Base):
     num_samples: Mapped[int | None] = mapped_column(Integer, nullable=True, default=10000)
 
     variants: Mapped[list["Variant"]] = relationship("Variant", back_populates="experiment")
-    metrics: Mapped[list["ExperimentMetric"]] = relationship("ExperimentMetric", back_populates="experiment")
-    guardrail_metrics: Mapped[list["GuardrailMetric"]] = relationship("GuardrailMetric", back_populates="experiment")
+    metrics: Mapped[list["ExperimentMetric"]] = relationship(
+        "ExperimentMetric", back_populates="experiment"
+    )
+    guardrail_metrics: Mapped[list["GuardrailMetric"]] = relationship(
+        "GuardrailMetric", back_populates="experiment"
+    )
 
 
 class Variant(Base):
@@ -104,8 +110,12 @@ class MetricDefinition(Base):
 class ExperimentMetric(Base):
     __tablename__ = "experiment_metrics"
 
-    experiment_id: Mapped[str] = mapped_column(String, ForeignKey("experiments.id"), primary_key=True)
-    metric_name: Mapped[str] = mapped_column(String, ForeignKey("metric_definitions.name"), primary_key=True)
+    experiment_id: Mapped[str] = mapped_column(
+        String, ForeignKey("experiments.id"), primary_key=True
+    )
+    metric_name: Mapped[str] = mapped_column(
+        String, ForeignKey("metric_definitions.name"), primary_key=True
+    )
 
     experiment: Mapped["Experiment"] = relationship("Experiment", back_populates="metrics")
     metric: Mapped["MetricDefinition"] = relationship("MetricDefinition")
@@ -114,12 +124,18 @@ class ExperimentMetric(Base):
 class GuardrailMetric(Base):
     __tablename__ = "guardrail_metrics"
 
-    experiment_id: Mapped[str] = mapped_column(String, ForeignKey("experiments.id"), primary_key=True)
-    metric_name: Mapped[str] = mapped_column(String, ForeignKey("metric_definitions.name"), primary_key=True)
+    experiment_id: Mapped[str] = mapped_column(
+        String, ForeignKey("experiments.id"), primary_key=True
+    )
+    metric_name: Mapped[str] = mapped_column(
+        String, ForeignKey("metric_definitions.name"), primary_key=True
+    )
     threshold: Mapped[float] = mapped_column(Float, nullable=False)
     operator: Mapped[str] = mapped_column(String, nullable=False)  # gt, lt, gte, lte
 
-    experiment: Mapped["Experiment"] = relationship("Experiment", back_populates="guardrail_metrics")
+    experiment: Mapped["Experiment"] = relationship(
+        "Experiment", back_populates="guardrail_metrics"
+    )
     metric: Mapped["MetricDefinition"] = relationship("MetricDefinition")
 
 

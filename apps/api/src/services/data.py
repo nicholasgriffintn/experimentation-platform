@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
+
 from pyiceberg.catalog import Catalog
 from pyiceberg.expressions import (
     And,
@@ -28,8 +29,10 @@ class IcebergDataService:
         namespace = "experiments"
 
         events_spec = PartitionSpec(
-            PartitionField(source_id=2, field_id=1000, transform=IdentityTransform(), name="experiment_id"),
-            PartitionField(source_id=3, field_id=1001, transform=DayTransform(), name="timestamp")
+            PartitionField(
+                source_id=2, field_id=1000, transform=IdentityTransform(), name="experiment_id"
+            ),
+            PartitionField(source_id=3, field_id=1001, transform=DayTransform(), name="timestamp"),
         )
 
         self.create_table(
@@ -37,8 +40,12 @@ class IcebergDataService:
         )
 
         metrics_spec = PartitionSpec(
-            PartitionField(source_id=2, field_id=1000, transform=IdentityTransform(), name="experiment_id"),
-            PartitionField(source_id=4, field_id=1001, transform=MonthTransform(), name="timestamp")
+            PartitionField(
+                source_id=2, field_id=1000, transform=IdentityTransform(), name="experiment_id"
+            ),
+            PartitionField(
+                source_id=4, field_id=1001, transform=MonthTransform(), name="timestamp"
+            ),
         )
 
         self.create_table(
@@ -46,7 +53,9 @@ class IcebergDataService:
         )
 
         assignments_spec = PartitionSpec(
-            PartitionField(source_id=2, field_id=1000, transform=IdentityTransform(), name="experiment_id")
+            PartitionField(
+                source_id=2, field_id=1000, transform=IdentityTransform(), name="experiment_id"
+            )
         )
 
         self.create_table(
@@ -56,8 +65,12 @@ class IcebergDataService:
         )
 
         results_spec = PartitionSpec(
-            PartitionField(source_id=2, field_id=1000, transform=IdentityTransform(), name="experiment_id"),
-            PartitionField(source_id=4, field_id=1001, transform=IdentityTransform(), name="metric_name")
+            PartitionField(
+                source_id=2, field_id=1000, transform=IdentityTransform(), name="experiment_id"
+            ),
+            PartitionField(
+                source_id=4, field_id=1001, transform=IdentityTransform(), name="metric_name"
+            ),
         )
 
         self.create_table(
@@ -119,12 +132,10 @@ class IcebergDataService:
             return {"id": experiment_id, "metrics": {}, "variants": []}
 
         scanner = assignments_table.scan()
-        if snapshot and hasattr(snapshot, 'snapshot_id'):
+        if snapshot and hasattr(snapshot, "snapshot_id"):
             scanner = scanner.use_ref(str(snapshot.snapshot_id))
-            
-        scanner = scanner.filter(
-            EqualTo(Reference("experiment_id"), experiment_id)
-        )
+
+        scanner = scanner.filter(EqualTo(Reference("experiment_id"), experiment_id))
         scanner = scanner.select("variant_id", "context")
 
         assignments = list(scanner.to_arrow())
@@ -142,7 +153,7 @@ class IcebergDataService:
         metrics_table = self.load_table(f"experiments.{experiment_id}_metrics")
         metrics_snapshot = metrics_table.current_snapshot()
 
-        if metrics_snapshot and hasattr(metrics_snapshot, 'snapshot_id'):
+        if metrics_snapshot and hasattr(metrics_snapshot, "snapshot_id"):
             metrics_scanner = metrics_table.scan()
             metrics_scanner = metrics_scanner.use_ref(str(metrics_snapshot.snapshot_id))
             metrics_scanner = metrics_scanner.filter(
@@ -160,7 +171,7 @@ class IcebergDataService:
     async def record_event(self, experiment_id: str, event_data: Dict) -> None:
         """Record an event for the experiment"""
         table = self.load_table(f"experiments.{experiment_id}_events")
-        
+
         data = {
             "event_id": str(uuid.uuid4()),
             "experiment_id": experiment_id,
@@ -177,7 +188,7 @@ class IcebergDataService:
     async def record_metric(self, experiment_id: str, metric_data: Dict) -> None:
         """Record a metric measurement"""
         table = self.load_table(f"experiments.{experiment_id}_metrics")
-        
+
         data = {
             "metric_id": str(uuid.uuid4()),
             "experiment_id": experiment_id,
@@ -195,7 +206,7 @@ class IcebergDataService:
     ) -> None:
         """Record a user-variant assignment"""
         table = self.load_table(f"experiments.{experiment_id}_assignments")
-        
+
         data = {
             "assignment_id": str(uuid.uuid4()),
             "experiment_id": experiment_id,
@@ -209,30 +220,32 @@ class IcebergDataService:
     async def record_results(self, experiment_id: str, results_data: Dict) -> None:
         """Record analysis results"""
         table = self.load_table(f"experiments.{experiment_id}_results")
-        
+
         metrics_results = results_data.get("metrics", {})
         timestamp = datetime.utcnow()
         rows = []
 
         for metric_name, metric_results in metrics_results.items():
             for variant_id, result in metric_results.items():
-                rows.append({
-                    "result_id": str(uuid.uuid4()),
-                    "experiment_id": experiment_id,
-                    "variant_id": variant_id,
-                    "metric_name": metric_name,
-                    "timestamp": timestamp,
-                    "sample_size": result.get("sample_size", 0),
-                    "mean": result.get("mean", 0.0),
-                    "variance": result.get("variance", 0.0),
-                    "confidence_level": result.get("confidence_level"),
-                    "p_value": result.get("p_value"),
-                    "metadata": {
-                        "status": results_data.get("status"),
-                        "total_users": results_data.get("total_users"),
-                        "correction_method": results_data.get("correction_method"),
-                    },
-                })
+                rows.append(
+                    {
+                        "result_id": str(uuid.uuid4()),
+                        "experiment_id": experiment_id,
+                        "variant_id": variant_id,
+                        "metric_name": metric_name,
+                        "timestamp": timestamp,
+                        "sample_size": result.get("sample_size", 0),
+                        "mean": result.get("mean", 0.0),
+                        "variance": result.get("variance", 0.0),
+                        "confidence_level": result.get("confidence_level"),
+                        "p_value": result.get("p_value"),
+                        "metadata": {
+                            "status": results_data.get("status"),
+                            "total_users": results_data.get("total_users"),
+                            "correction_method": results_data.get("correction_method"),
+                        },
+                    }
+                )
 
         table.append(rows)
 
@@ -245,31 +258,29 @@ class IcebergDataService:
     ) -> List[Dict]:
         """Query events within a time range"""
         table = self.load_table(f"experiments.{experiment_id}_events")
-        
+
         scanner = table.scan()
         scanner = scanner.filter(
             And(
                 EqualTo(Reference("experiment_id"), experiment_id),
                 And(
                     GreaterThanOrEqual(Reference("timestamp"), start_time.timestamp()),
-                    LessThanOrEqual(Reference("timestamp"), end_time.timestamp())
-                )
+                    LessThanOrEqual(Reference("timestamp"), end_time.timestamp()),
+                ),
             )
         )
 
         return list(scanner.to_arrow())
 
-    async def get_metric_history(
-        self, experiment_id: str, metric_name: str
-    ) -> List[Dict]:
+    async def get_metric_history(self, experiment_id: str, metric_name: str) -> List[Dict]:
         """Get historical metric data"""
         table = self.load_table(f"experiments.{experiment_id}_metrics")
-        
+
         scanner = table.scan()
         scanner = scanner.filter(
             And(
                 EqualTo(Reference("experiment_id"), experiment_id),
-                EqualTo(Reference("metric_name"), metric_name)
+                EqualTo(Reference("metric_name"), metric_name),
             )
         )
 
@@ -278,28 +289,26 @@ class IcebergDataService:
     async def get_exposure_data(self, experiment_id: str) -> List[Dict]:
         """Get exposure data for an experiment"""
         table = self.load_table(f"experiments.{experiment_id}_events")
-        
+
         scanner = table.scan()
         scanner = scanner.filter(
             And(
                 EqualTo(Reference("experiment_id"), experiment_id),
-                EqualTo(Reference("event_type"), "exposure")
+                EqualTo(Reference("event_type"), "exposure"),
             )
         )
 
         return list(scanner.to_arrow())
 
-    async def get_metric_data(
-        self, experiment_id: str, metric_name: str
-    ) -> Dict[str, List[float]]:
+    async def get_metric_data(self, experiment_id: str, metric_name: str) -> Dict[str, List[float]]:
         """Get metric data grouped by variant"""
         table = self.load_table(f"experiments.{experiment_id}_metrics")
-        
+
         scanner = table.scan()
         scanner = scanner.filter(
             And(
                 EqualTo(Reference("experiment_id"), experiment_id),
-                EqualTo(Reference("metric_name"), metric_name)
+                EqualTo(Reference("metric_name"), metric_name),
             )
         )
 
@@ -323,7 +332,7 @@ class IcebergDataService:
         events_scanner = events_scanner.filter(
             And(
                 EqualTo(Reference("experiment_id"), experiment_id),
-                LessThanOrEqual(Reference("timestamp"), timestamp.timestamp())
+                LessThanOrEqual(Reference("timestamp"), timestamp.timestamp()),
             )
         )
 
@@ -331,7 +340,7 @@ class IcebergDataService:
         metrics_scanner = metrics_scanner.filter(
             And(
                 EqualTo(Reference("experiment_id"), experiment_id),
-                LessThanOrEqual(Reference("timestamp"), timestamp.timestamp())
+                LessThanOrEqual(Reference("timestamp"), timestamp.timestamp()),
             )
         )
 

@@ -287,7 +287,7 @@ async def get_results(
     get_experiment_from_db(experiment_id, db)
 
     results = await experiment_service.analyze_results(experiment_id=experiment_id, metrics=metrics)
-    
+
     return ExperimentResults(
         experiment_id=results["experiment_id"],
         status=results["status"],
@@ -594,7 +594,9 @@ def create_experiment_in_db(experiment: ExperimentCreate, db: Session) -> DBExpe
         experiment_data["prior_trials"] = experiment.analysis_config.prior_trials
         experiment_data["num_samples"] = experiment.analysis_config.num_samples
         if experiment.analysis_config.default_metric_config:
-            experiment_data["default_metric_config"] = experiment.analysis_config.default_metric_config.model_dump()
+            experiment_data["default_metric_config"] = (
+                experiment.analysis_config.default_metric_config.model_dump()
+            )
 
     db_experiment = DBExperiment(**experiment_data)
     db.add(db_experiment)

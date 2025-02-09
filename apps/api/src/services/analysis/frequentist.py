@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 from scipy import stats
-from scipy.stats import mannwhitneyu, ttest_ind, chi2_contingency
+from scipy.stats import chi2_contingency, mannwhitneyu, ttest_ind
 
 from ...models.metrics_model import MetricType
 
@@ -78,7 +78,8 @@ class StatisticalAnalysisService:
                     control_mean=float(stats["control_mean"]),
                     variant_mean=float(stats["variant_mean"]),
                     relative_difference=float(
-                        ((stats["variant_mean"] - stats["control_mean"]) / stats["control_mean"]) * 100
+                        ((stats["variant_mean"] - stats["control_mean"]) / stats["control_mean"])
+                        * 100
                     ),
                     p_value=float(stats["p_value"]),
                     confidence_interval=(0.0, 0.0),

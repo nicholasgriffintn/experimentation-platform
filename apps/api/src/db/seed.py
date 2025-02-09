@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
+from typing import List, TypedDict
 from uuid import uuid4
-from typing import TypedDict, List
 
 from pyiceberg.catalog import load_catalog
 from sqlalchemy.orm import Session
@@ -110,6 +110,7 @@ class GuardrailConfig(TypedDict):
     metric: str
     threshold: float
     operator: str
+
 
 class ExperimentConfig(TypedDict):
     exp: DBExperiment

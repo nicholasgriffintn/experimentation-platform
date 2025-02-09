@@ -22,7 +22,12 @@ class IcebergSchemas:
             NestedField(6, "event_type", StringType(), required=True),
             NestedField(7, "event_value", DoubleType(), required=False),
             NestedField(8, "client_id", StringType(), required=False),
-            NestedField(9, "metadata", MapType(key_type=StringType(), value_type=StringType()), required=False),
+            NestedField(
+                9,
+                "metadata",
+                MapType(key_type=StringType(), value_type=StringType()),
+                required=False,
+            ),
         )
         return schema
 
@@ -37,7 +42,12 @@ class IcebergSchemas:
             NestedField(5, "metric_name", StringType(), required=True),
             NestedField(6, "metric_value", DoubleType(), required=True),
             NestedField(7, "segment", StringType(), required=False),
-            NestedField(8, "metadata", MapType(key_type=StringType(), value_type=StringType()), required=False),
+            NestedField(
+                8,
+                "metadata",
+                MapType(key_type=StringType(), value_type=StringType()),
+                required=False,
+            ),
         )
         return schema
 
@@ -50,7 +60,12 @@ class IcebergSchemas:
             NestedField(3, "user_id", StringType(), required=True),
             NestedField(4, "variant_id", StringType(), required=True),
             NestedField(5, "timestamp", TimestampType(), required=True),
-            NestedField(6, "context", MapType(key_type=StringType(), value_type=StringType()), required=False),
+            NestedField(
+                6,
+                "context",
+                MapType(key_type=StringType(), value_type=StringType()),
+                required=False,
+            ),
         )
         return schema
 
@@ -68,6 +83,11 @@ class IcebergSchemas:
             NestedField(8, "variance", DoubleType(), required=True),
             NestedField(9, "confidence_level", DoubleType(), required=False),
             NestedField(10, "p_value", DoubleType(), required=False),
-            NestedField(11, "metadata", MapType(key_type=StringType(), value_type=StringType()), required=False),
+            NestedField(
+                11,
+                "metadata",
+                MapType(key_type=StringType(), value_type=StringType()),
+                required=False,
+            ),
         )
         return schema

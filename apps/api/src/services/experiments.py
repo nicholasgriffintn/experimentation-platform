@@ -64,14 +64,18 @@ class ExperimentService:
         self.bucketing_service = bucketing_service or BucketingService()
         self.cache_service = cache_service
 
-    async def _get_user_variant(self, experiment_id: str, user_context: Dict) -> Optional[VariantConfig]:
+    async def _get_user_variant(
+        self, experiment_id: str, user_context: Dict
+    ) -> Optional[VariantConfig]:
         """Get the variant assigned to a user"""
         user_id = user_context.get("user_id")
         if not user_id:
             return None
 
         if self.cache_service:
-            cached_assignment = await self.cache_service.get_variant_assignment(experiment_id, user_id)
+            cached_assignment = await self.cache_service.get_variant_assignment(
+                experiment_id, user_id
+            )
             if cached_assignment:
                 return VariantConfig(**cached_assignment)
 

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Union, Callable, Awaitable
+from typing import Any, Awaitable, Callable, Dict, Optional, Union
 
 from fastapi import Request, status
 from fastapi.responses import JSONResponse, Response
@@ -41,8 +41,7 @@ class ResourceNotFoundError(ExperimentationError):
 
 
 async def error_handler(
-    request: Request,
-    call_next: Callable[[Request], Awaitable[Response]]
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
     """Global error handling middleware"""
     try:
