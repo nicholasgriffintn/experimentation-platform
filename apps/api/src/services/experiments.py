@@ -9,9 +9,8 @@ from .bucketing import BucketingService
 from ..models.experiment import AnalysisMethod, CorrectionMethod
 
 class ExperimentType(str, Enum):
-    AB = "ab"
-    ABN = "abn"
-    MVT = "mvt"
+    AB_TEST = "ab_test"
+    MULTIVARIATE = "multivariate"
     FEATURE_FLAG = "feature_flag"
 
 class VariantType(str, Enum):
