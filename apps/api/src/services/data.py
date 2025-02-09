@@ -73,22 +73,104 @@ class IcebergDataService:
 
     async def get_experiment_config(self, experiment_id: str) -> Dict:
         """Get experiment configuration from database"""
-        # TODO: Implement proper config retrieval
+        assignments_table = self.load_table(f"experiments.{experiment_id}_assignments")
+        
+        snapshot = assignments_table.current_snapshot()
+        if not snapshot:
+            return {
+                'id': experiment_id,
+                'metrics': {},
+                'variants': []
+            }
+            
+        scanner = assignments_table.new_scan() \
+            .use_snapshot(snapshot.snapshot_id) \
+            .filter(
+                assignments_table.expr.ref("experiment_id").eq(experiment_id)
+            ) \
+            .select(
+                "variant_id",
+                "context"
+            )
+            
+        assignments = list(scanner.plan_scan())
+        
+        variants = list({
+            assignment['variant_id']: {
+                'id': assignment['variant_id'],
+                'context': assignment['context']
+            }
+            for assignment in assignments
+        }.values())
+        
+        metrics_table = self.load_table(f"experiments.{experiment_id}_metrics")
+        metrics_snapshot = metrics_table.current_snapshot()
+        
+        if metrics_snapshot:
+            metrics_scanner = metrics_table.new_scan() \
+                .use_snapshot(metrics_snapshot.snapshot_id) \
+                .filter(
+                    metrics_table.expr.ref("experiment_id").eq(experiment_id)
+                ) \
+                .select(
+                    "metric_name",
+                    "metadata"
+                )
+                
+            metrics = list(metrics_scanner.plan_scan())
+            metrics_config = {
+                metric['metric_name']: metric['metadata']
+                for metric in metrics
+            }
+        else:
+            metrics_config = {}
+        
         return {
             'id': experiment_id,
-            'metrics': {},
-            'variants': []
+            'metrics': metrics_config,
+            'variants': variants
         }
 
     async def record_event(self, experiment_id: str, event_data: Dict) -> None:
         """Record an event for the experiment"""
-        # TODO: Implement event recording
-        pass
+        table = self.load_table(f"experiments.{experiment_id}_events")
+        
+        with table.new_transaction() as transaction:
+            transaction.new_append() \
+                .add_row({
+                    "event_id": str(uuid.uuid4()),
+                    "experiment_id": experiment_id,
+                    "timestamp": datetime.utcnow(),
+                    "user_id": event_data.get("user_id"),
+                    "variant_id": event_data.get("variant_id"),
+                    "event_type": event_data.get("event_type"),
+                    "event_value": event_data.get("value"),
+                    "client_id": event_data.get("client_id"),
+                    "metadata": event_data.get("metadata", {})
+                }) \
+                .commit()
+            
+            transaction.commit()
 
     async def record_metric(self, experiment_id: str, metric_data: Dict) -> None:
         """Record a metric measurement"""
-        # TODO: Implement metric recording
-        pass
+        table = self.load_table(f"experiments.{experiment_id}_metrics")
+        
+        with table.new_transaction() as transaction:
+            transaction.new_append() \
+                .add_row({
+                    "metric_id": str(uuid.uuid4()),
+                    "experiment_id": experiment_id,
+                    "variant_id": metric_data.get("variant_id"),
+                    "timestamp": datetime.utcnow(),
+                    "metric_name": metric_data.get("metric_name"),
+                    "metric_value": metric_data.get("metric_value"),
+                    "segment": metric_data.get("segment"),
+                    "metadata": metric_data.get("metadata", {})
+                }) \
+                .commit()
+            
+            transaction.commit()
 
     async def assign_variant(self, experiment_id: str, user_id: str, variant_id: str, context: Optional[Dict] = None):
         """Record a user-variant assignment"""
@@ -110,8 +192,36 @@ class IcebergDataService:
 
     async def record_results(self, experiment_id: str, results_data: Dict) -> None:
         """Record analysis results"""
-        # TODO: Implement results recording
-        pass
+        table = self.load_table(f"experiments.{experiment_id}_results")
+        
+        metrics_results = results_data.get("metrics", {})
+        timestamp = datetime.utcnow()
+        
+        with table.new_transaction() as transaction:
+            append = transaction.new_append()
+            
+            for metric_name, metric_results in metrics_results.items():
+                for variant_id, result in metric_results.items():
+                    append.add_row({
+                        "result_id": str(uuid.uuid4()),
+                        "experiment_id": experiment_id,
+                        "variant_id": variant_id,
+                        "metric_name": metric_name,
+                        "timestamp": timestamp,
+                        "sample_size": result.get("sample_size", 0),
+                        "mean": result.get("mean", 0.0),
+                        "variance": result.get("variance", 0.0),
+                        "confidence_level": result.get("confidence_level"),
+                        "p_value": result.get("p_value"),
+                        "metadata": {
+                            "status": results_data.get("status"),
+                            "total_users": results_data.get("total_users"),
+                            "correction_method": results_data.get("correction_method")
+                        }
+                    })
+            
+            append.commit()
+            transaction.commit()
 
     def load_table(self, table_name: str) -> Table:
         """Load an Iceberg table"""
@@ -135,8 +245,29 @@ class IcebergDataService:
 
     async def get_metric_history(self, experiment_id: str, metric_name: str) -> List[Dict]:
         """Get metric history for an experiment"""
-        # TODO: Implement metric history retrieval
-        return []
+        table = self.load_table(f"experiments.{experiment_id}_metrics")
+        
+        snapshot = table.current_snapshot()
+        scanner = table.new_scan() \
+            .use_snapshot(snapshot.snapshot_id) \
+            .filter(
+                table.expr.and_(
+                    table.expr.ref("experiment_id").eq(experiment_id),
+                    table.expr.ref("metric_name").eq(metric_name)
+                )
+            ) \
+            .select(
+                "metric_id",
+                "experiment_id",
+                "variant_id",
+                "timestamp",
+                "metric_name",
+                "metric_value",
+                "segment",
+                "metadata"
+            )
+            
+        return list(scanner.plan_scan())
 
     async def get_experiment_snapshot(self, experiment_id: str, timestamp: datetime) -> Dict:
         """Get a snapshot of experiment state at a specific time"""
