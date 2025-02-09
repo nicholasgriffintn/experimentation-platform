@@ -23,7 +23,9 @@ class FeatureDefinition(BaseModel):
 
 
 @router.post("/", response_model=FeatureDefinition)
-async def create_feature(feature: FeatureDefinition, db: Session = Depends(get_db)):
+async def create_feature(
+    feature: FeatureDefinition, db: Session = Depends(get_db)
+) -> FeatureDefinition:
     """
     Create a new feature definition.
 
@@ -58,11 +60,11 @@ async def create_feature(feature: FeatureDefinition, db: Session = Depends(get_d
     db.add(db_feature)
     db.commit()
     db.refresh(db_feature)
-    return db_feature
+    return FeatureDefinition.model_validate(db_feature)
 
 
 @router.get("/", response_model=List[FeatureDefinition])
-async def list_features(db: Session = Depends(get_db)):
+async def list_features(db: Session = Depends(get_db)) -> List[FeatureDefinition]:
     """
     List all feature definitions.
 
@@ -72,11 +74,12 @@ async def list_features(db: Session = Depends(get_db)):
     Returns:
         List[FeatureDefinition]: List of all feature definitions
     """
-    return db.query(DBFeatureDefinition).all()
+    db_features = db.query(DBFeatureDefinition).all()
+    return [FeatureDefinition.model_validate(f) for f in db_features]
 
 
 @router.get("/{feature_name}", response_model=FeatureDefinition)
-async def get_feature(feature_name: str, db: Session = Depends(get_db)):
+async def get_feature(feature_name: str, db: Session = Depends(get_db)) -> FeatureDefinition:
     """
     Get a feature definition by name.
 
@@ -93,13 +96,13 @@ async def get_feature(feature_name: str, db: Session = Depends(get_db)):
     feature = db.query(DBFeatureDefinition).filter(DBFeatureDefinition.name == feature_name).first()
     if not feature:
         raise ResourceNotFoundError("Feature", feature_name)
-    return feature
+    return FeatureDefinition.model_validate(feature)
 
 
 @router.put("/{feature_name}", response_model=FeatureDefinition)
 async def update_feature(
     feature_name: str, feature_update: FeatureDefinition, db: Session = Depends(get_db)
-):
+) -> FeatureDefinition:
     """
     Update a feature definition.
 
@@ -123,11 +126,11 @@ async def update_feature(
 
     db.commit()
     db.refresh(feature)
-    return feature
+    return FeatureDefinition.model_validate(feature)
 
 
 @router.delete("/{feature_name}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_feature(feature_name: str, db: Session = Depends(get_db)):
+async def delete_feature(feature_name: str, db: Session = Depends(get_db)) -> None:
     """
     Delete a feature definition.
 

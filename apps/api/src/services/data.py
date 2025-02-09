@@ -1,11 +1,18 @@
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
-
 from pyiceberg.catalog import Catalog
-from pyiceberg.partitioning import PartitionSpec
+from pyiceberg.expressions import (
+    And,
+    EqualTo,
+    GreaterThanOrEqual,
+    LessThanOrEqual,
+    Reference,
+)
+from pyiceberg.partitioning import PartitionField, PartitionSpec
 from pyiceberg.schema import Schema
 from pyiceberg.table import Table
+from pyiceberg.transforms import DayTransform, IdentityTransform, MonthTransform
 
 from ..schema.iceberg_schema import IcebergSchemas
 from ..utils.logger import logger
@@ -20,19 +27,27 @@ class IcebergDataService:
         """Initialize all required tables for a new experiment"""
         namespace = "experiments"
 
-        events_spec = PartitionSpec.builder().identity("experiment_id").day("timestamp").build()
+        events_spec = PartitionSpec(
+            PartitionField(source_id=2, field_id=1000, transform=IdentityTransform(), name="experiment_id"),
+            PartitionField(source_id=3, field_id=1001, transform=DayTransform(), name="timestamp")
+        )
 
         self.create_table(
             f"{namespace}.{experiment_id}_events", self.schemas.get_events_schema(), events_spec
         )
 
-        metrics_spec = PartitionSpec.builder().identity("experiment_id").month("timestamp").build()
+        metrics_spec = PartitionSpec(
+            PartitionField(source_id=2, field_id=1000, transform=IdentityTransform(), name="experiment_id"),
+            PartitionField(source_id=4, field_id=1001, transform=MonthTransform(), name="timestamp")
+        )
 
         self.create_table(
             f"{namespace}.{experiment_id}_metrics", self.schemas.get_metrics_schema(), metrics_spec
         )
 
-        assignments_spec = PartitionSpec.builder().identity("experiment_id").build()
+        assignments_spec = PartitionSpec(
+            PartitionField(source_id=2, field_id=1000, transform=IdentityTransform(), name="experiment_id")
+        )
 
         self.create_table(
             f"{namespace}.{experiment_id}_assignments",
@@ -40,15 +55,16 @@ class IcebergDataService:
             assignments_spec,
         )
 
-        results_spec = (
-            PartitionSpec.builder().identity("experiment_id").identity("metric_name").build()
+        results_spec = PartitionSpec(
+            PartitionField(source_id=2, field_id=1000, transform=IdentityTransform(), name="experiment_id"),
+            PartitionField(source_id=4, field_id=1001, transform=IdentityTransform(), name="metric_name")
         )
 
         self.create_table(
             f"{namespace}.{experiment_id}_results", self.schemas.get_results_schema(), results_spec
         )
 
-    def create_table(self, table_name: str, schema: Schema, partition_spec: PartitionSpec):
+    def create_table(self, table_name: str, schema: Schema, partition_spec: PartitionSpec) -> bool:
         """Create a new Iceberg table"""
         try:
             try:
@@ -102,14 +118,16 @@ class IcebergDataService:
         if not snapshot:
             return {"id": experiment_id, "metrics": {}, "variants": []}
 
-        scanner = (
-            assignments_table.new_scan()
-            .use_snapshot(snapshot.snapshot_id)
-            .filter(assignments_table.expr.ref("experiment_id").eq(experiment_id))
-            .select("variant_id", "context")
+        scanner = assignments_table.scan()
+        if snapshot and hasattr(snapshot, 'snapshot_id'):
+            scanner = scanner.use_ref(str(snapshot.snapshot_id))
+            
+        scanner = scanner.filter(
+            EqualTo(Reference("experiment_id"), experiment_id)
         )
+        scanner = scanner.select("variant_id", "context")
 
-        assignments = list(scanner.plan_scan())
+        assignments = list(scanner.to_arrow())
 
         variants = list(
             {
@@ -124,15 +142,15 @@ class IcebergDataService:
         metrics_table = self.load_table(f"experiments.{experiment_id}_metrics")
         metrics_snapshot = metrics_table.current_snapshot()
 
-        if metrics_snapshot:
-            metrics_scanner = (
-                metrics_table.new_scan()
-                .use_snapshot(metrics_snapshot.snapshot_id)
-                .filter(metrics_table.expr.ref("experiment_id").eq(experiment_id))
-                .select("metric_name", "metadata")
+        if metrics_snapshot and hasattr(metrics_snapshot, 'snapshot_id'):
+            metrics_scanner = metrics_table.scan()
+            metrics_scanner = metrics_scanner.use_ref(str(metrics_snapshot.snapshot_id))
+            metrics_scanner = metrics_scanner.filter(
+                EqualTo(Reference("experiment_id"), experiment_id)
             )
+            metrics_scanner = metrics_scanner.select("metric_name", "metadata")
 
-            metrics = list(metrics_scanner.plan_scan())
+            metrics = list(metrics_scanner.to_arrow())
             metrics_config = {metric["metric_name"]: metric["metadata"] for metric in metrics}
         else:
             metrics_config = {}
@@ -142,98 +160,81 @@ class IcebergDataService:
     async def record_event(self, experiment_id: str, event_data: Dict) -> None:
         """Record an event for the experiment"""
         table = self.load_table(f"experiments.{experiment_id}_events")
-
-        with table.new_transaction() as transaction:
-            transaction.new_append().add_row(
-                {
-                    "event_id": str(uuid.uuid4()),
-                    "experiment_id": experiment_id,
-                    "timestamp": datetime.utcnow(),
-                    "user_id": event_data.get("user_id"),
-                    "variant_id": event_data.get("variant_id"),
-                    "event_type": event_data.get("event_type"),
-                    "event_value": event_data.get("value"),
-                    "client_id": event_data.get("client_id"),
-                    "metadata": event_data.get("metadata", {}),
-                }
-            ).commit()
-
-            transaction.commit()
+        
+        data = {
+            "event_id": str(uuid.uuid4()),
+            "experiment_id": experiment_id,
+            "timestamp": datetime.utcnow(),
+            "user_id": event_data.get("user_id"),
+            "variant_id": event_data.get("variant_id"),
+            "event_type": event_data.get("event_type"),
+            "event_value": event_data.get("value"),
+            "client_id": event_data.get("client_id"),
+            "metadata": event_data.get("metadata", {}),
+        }
+        table.append([data])
 
     async def record_metric(self, experiment_id: str, metric_data: Dict) -> None:
         """Record a metric measurement"""
         table = self.load_table(f"experiments.{experiment_id}_metrics")
-
-        with table.new_transaction() as transaction:
-            transaction.new_append().add_row(
-                {
-                    "metric_id": str(uuid.uuid4()),
-                    "experiment_id": experiment_id,
-                    "variant_id": metric_data.get("variant_id"),
-                    "timestamp": datetime.utcnow(),
-                    "metric_name": metric_data.get("metric_name"),
-                    "metric_value": metric_data.get("metric_value"),
-                    "segment": metric_data.get("segment"),
-                    "metadata": metric_data.get("metadata", {}),
-                }
-            ).commit()
-
-            transaction.commit()
+        
+        data = {
+            "metric_id": str(uuid.uuid4()),
+            "experiment_id": experiment_id,
+            "variant_id": metric_data.get("variant_id"),
+            "timestamp": datetime.utcnow(),
+            "metric_name": metric_data.get("metric_name"),
+            "metric_value": metric_data.get("metric_value"),
+            "segment": metric_data.get("segment"),
+            "metadata": metric_data.get("metadata", {}),
+        }
+        table.append([data])
 
     async def assign_variant(
         self, experiment_id: str, user_id: str, variant_id: str, context: Optional[Dict] = None
-    ):
+    ) -> None:
         """Record a user-variant assignment"""
         table = self.load_table(f"experiments.{experiment_id}_assignments")
-
-        with table.new_transaction() as transaction:
-            transaction.new_append().add_row(
-                {
-                    "assignment_id": str(uuid.uuid4()),
-                    "experiment_id": experiment_id,
-                    "user_id": user_id,
-                    "variant_id": variant_id,
-                    "timestamp": datetime.utcnow(),
-                    "context": context or {},
-                }
-            ).commit()
-
-            transaction.commit()
+        
+        data = {
+            "assignment_id": str(uuid.uuid4()),
+            "experiment_id": experiment_id,
+            "user_id": user_id,
+            "variant_id": variant_id,
+            "timestamp": datetime.utcnow(),
+            "context": context or {},
+        }
+        table.append([data])
 
     async def record_results(self, experiment_id: str, results_data: Dict) -> None:
         """Record analysis results"""
         table = self.load_table(f"experiments.{experiment_id}_results")
-
+        
         metrics_results = results_data.get("metrics", {})
         timestamp = datetime.utcnow()
+        rows = []
 
-        with table.new_transaction() as transaction:
-            append = transaction.new_append()
+        for metric_name, metric_results in metrics_results.items():
+            for variant_id, result in metric_results.items():
+                rows.append({
+                    "result_id": str(uuid.uuid4()),
+                    "experiment_id": experiment_id,
+                    "variant_id": variant_id,
+                    "metric_name": metric_name,
+                    "timestamp": timestamp,
+                    "sample_size": result.get("sample_size", 0),
+                    "mean": result.get("mean", 0.0),
+                    "variance": result.get("variance", 0.0),
+                    "confidence_level": result.get("confidence_level"),
+                    "p_value": result.get("p_value"),
+                    "metadata": {
+                        "status": results_data.get("status"),
+                        "total_users": results_data.get("total_users"),
+                        "correction_method": results_data.get("correction_method"),
+                    },
+                })
 
-            for metric_name, metric_results in metrics_results.items():
-                for variant_id, result in metric_results.items():
-                    append.add_row(
-                        {
-                            "result_id": str(uuid.uuid4()),
-                            "experiment_id": experiment_id,
-                            "variant_id": variant_id,
-                            "metric_name": metric_name,
-                            "timestamp": timestamp,
-                            "sample_size": result.get("sample_size", 0),
-                            "mean": result.get("mean", 0.0),
-                            "variance": result.get("variance", 0.0),
-                            "confidence_level": result.get("confidence_level"),
-                            "p_value": result.get("p_value"),
-                            "metadata": {
-                                "status": results_data.get("status"),
-                                "total_users": results_data.get("total_users"),
-                                "correction_method": results_data.get("correction_method"),
-                            },
-                        }
-                    )
-
-            append.commit()
-            transaction.commit()
+        table.append(rows)
 
     def load_table(self, table_name: str) -> Table:
         """Load an Iceberg table"""
@@ -244,62 +245,100 @@ class IcebergDataService:
     ) -> List[Dict]:
         """Query events within a time range"""
         table = self.load_table(f"experiments.{experiment_id}_events")
-
-        snapshot = table.current_snapshot()
-        scanner = (
-            table.new_scan()
-            .use_snapshot(snapshot.snapshot_id)
-            .filter(
-                table.expr.and_(
-                    table.expr.ref("timestamp").gt(start_time),
-                    table.expr.ref("timestamp").lt(end_time),
+        
+        scanner = table.scan()
+        scanner = scanner.filter(
+            And(
+                EqualTo(Reference("experiment_id"), experiment_id),
+                And(
+                    GreaterThanOrEqual(Reference("timestamp"), start_time.timestamp()),
+                    LessThanOrEqual(Reference("timestamp"), end_time.timestamp())
                 )
             )
         )
 
-        return list(scanner.plan_scan())
+        return list(scanner.to_arrow())
 
-    async def get_metric_history(self, experiment_id: str, metric_name: str) -> List[Dict]:
-        """Get metric history for an experiment"""
+    async def get_metric_history(
+        self, experiment_id: str, metric_name: str
+    ) -> List[Dict]:
+        """Get historical metric data"""
         table = self.load_table(f"experiments.{experiment_id}_metrics")
-
-        snapshot = table.current_snapshot()
-        scanner = (
-            table.new_scan()
-            .use_snapshot(snapshot.snapshot_id)
-            .filter(
-                table.expr.and_(
-                    table.expr.ref("experiment_id").eq(experiment_id),
-                    table.expr.ref("metric_name").eq(metric_name),
-                )
-            )
-            .select(
-                "metric_id",
-                "experiment_id",
-                "variant_id",
-                "timestamp",
-                "metric_name",
-                "metric_value",
-                "segment",
-                "metadata",
+        
+        scanner = table.scan()
+        scanner = scanner.filter(
+            And(
+                EqualTo(Reference("experiment_id"), experiment_id),
+                EqualTo(Reference("metric_name"), metric_name)
             )
         )
 
-        return list(scanner.plan_scan())
+        return list(scanner.to_arrow())
+
+    async def get_exposure_data(self, experiment_id: str) -> List[Dict]:
+        """Get exposure data for an experiment"""
+        table = self.load_table(f"experiments.{experiment_id}_events")
+        
+        scanner = table.scan()
+        scanner = scanner.filter(
+            And(
+                EqualTo(Reference("experiment_id"), experiment_id),
+                EqualTo(Reference("event_type"), "exposure")
+            )
+        )
+
+        return list(scanner.to_arrow())
+
+    async def get_metric_data(
+        self, experiment_id: str, metric_name: str
+    ) -> Dict[str, List[float]]:
+        """Get metric data grouped by variant"""
+        table = self.load_table(f"experiments.{experiment_id}_metrics")
+        
+        scanner = table.scan()
+        scanner = scanner.filter(
+            And(
+                EqualTo(Reference("experiment_id"), experiment_id),
+                EqualTo(Reference("metric_name"), metric_name)
+            )
+        )
+
+        data = list(scanner.to_arrow())
+        grouped_data: Dict[str, List[float]] = {}
+
+        for row in data:
+            variant_id = row["variant_id"]
+            if variant_id not in grouped_data:
+                grouped_data[variant_id] = []
+            grouped_data[variant_id].append(row["metric_value"])
+
+        return grouped_data
 
     async def get_experiment_snapshot(self, experiment_id: str, timestamp: datetime) -> Dict:
-        """Get a snapshot of experiment state at a specific time"""
+        """Get experiment state at a specific point in time"""
         events_table = self.load_table(f"experiments.{experiment_id}_events")
         metrics_table = self.load_table(f"experiments.{experiment_id}_metrics")
 
-        events_snapshot = events_table.snapshot_for_timestamp(int(timestamp.timestamp() * 1000))
-        metrics_snapshot = metrics_table.snapshot_for_timestamp(int(timestamp.timestamp() * 1000))
+        events_scanner = events_table.scan()
+        events_scanner = events_scanner.filter(
+            And(
+                EqualTo(Reference("experiment_id"), experiment_id),
+                LessThanOrEqual(Reference("timestamp"), timestamp.timestamp())
+            )
+        )
+
+        metrics_scanner = metrics_table.scan()
+        metrics_scanner = metrics_scanner.filter(
+            And(
+                EqualTo(Reference("experiment_id"), experiment_id),
+                LessThanOrEqual(Reference("timestamp"), timestamp.timestamp())
+            )
+        )
+
+        events = list(events_scanner.to_arrow())
+        metrics = list(metrics_scanner.to_arrow())
 
         return {
-            "events": list(
-                events_table.new_scan().use_snapshot(events_snapshot.snapshot_id).plan_scan()
-            ),
-            "metrics": list(
-                metrics_table.new_scan().use_snapshot(metrics_snapshot.snapshot_id).plan_scan()
-            ),
+            "events": events,
+            "metrics": metrics,
         }

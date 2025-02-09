@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 from scipy import stats
+from scipy.stats import mannwhitneyu, ttest_ind, chi2_contingency
 
 from ...models.metrics_model import MetricType
 
@@ -33,7 +34,7 @@ class StatisticalAnalysisService:
 
     def _validate_input_data(
         self, control_data: List[float], variant_data: List[float], metric_type: MetricType
-    ):
+    ) -> None:
         """Validate input data based on metric type and requirements"""
         if not control_data or not variant_data:
             raise ValueError("Control and variant data cannot be empty")
@@ -61,9 +62,30 @@ class StatisticalAnalysisService:
         variant_data: List[float],
         metric_type: MetricType,
         metric_name: str,
+        sequential: bool = False,
+        stopping_threshold: float = 0.01,
     ) -> ExperimentResult:
         """Perform statistical analysis on experiment data"""
         self._validate_input_data(control_data, variant_data, metric_type)
+
+        if sequential:
+            should_stop, stats = self._check_sequential_stopping(
+                control_data, variant_data, metric_type, stopping_threshold
+            )
+            if should_stop:
+                return ExperimentResult(
+                    metric_name=metric_name,
+                    control_mean=float(stats["control_mean"]),
+                    variant_mean=float(stats["variant_mean"]),
+                    relative_difference=float(
+                        ((stats["variant_mean"] - stats["control_mean"]) / stats["control_mean"]) * 100
+                    ),
+                    p_value=float(stats["p_value"]),
+                    confidence_interval=(0.0, 0.0),
+                    sample_size={"control": len(control_data), "variant": len(variant_data)},
+                    power=1.0,
+                    is_significant=bool(stats["p_value"] < self.alpha),
+                )
 
         control_mean = np.mean(control_data)
         variant_mean = np.mean(variant_data)
@@ -73,27 +95,27 @@ class StatisticalAnalysisService:
             p_value = self._calculate_binary_significance(control_data, variant_data)
             ci = self._calculate_binary_confidence_interval(control_data, variant_data)
         elif metric_type == MetricType.COUNT:
-            _, p_value = stats.mannwhitneyu(control_data, variant_data, alternative="two-sided")
+            stat, p_value = mannwhitneyu(control_data, variant_data, alternative="two-sided")
             ci = self._calculate_continuous_confidence_interval(control_data, variant_data)
         elif metric_type == MetricType.RATIO:
-            t_stat, p_value = stats.ttest_ind(control_data, variant_data)
+            stat, p_value = ttest_ind(control_data, variant_data)
             ci = self._calculate_ratio_confidence_interval(control_data, variant_data)
         else:
-            t_stat, p_value = stats.ttest_ind(control_data, variant_data)
+            stat, p_value = ttest_ind(control_data, variant_data)
             ci = self._calculate_continuous_confidence_interval(control_data, variant_data)
 
         power = self._calculate_power(control_data, variant_data)
 
         return ExperimentResult(
             metric_name=metric_name,
-            control_mean=control_mean,
-            variant_mean=variant_mean,
-            relative_difference=relative_diff,
-            p_value=p_value,
-            confidence_interval=ci,
+            control_mean=float(control_mean),
+            variant_mean=float(variant_mean),
+            relative_difference=float(relative_diff),
+            p_value=float(p_value),
+            confidence_interval=(float(ci[0]), float(ci[1])),
             sample_size={"control": len(control_data), "variant": len(variant_data)},
-            power=power,
-            is_significant=p_value < self.alpha,
+            power=float(power),
+            is_significant=bool(p_value < self.alpha),
         )
 
     def _calculate_binary_significance(
@@ -110,8 +132,8 @@ class StatisticalAnalysisService:
             ]
         )
 
-        _, p_value = stats.chi2_contingency(contingency_table)
-        return p_value
+        _, p_value = chi2_contingency(contingency_table)
+        return float(p_value)
 
     def _calculate_binary_confidence_interval(
         self, control_data: List[float], variant_data: List[float]
@@ -156,11 +178,12 @@ class StatisticalAnalysisService:
     def _calculate_power(self, control_data: List[float], variant_data: List[float]) -> float:
         """Calculate statistical power"""
         effect_size = self._cohens_d(control_data, variant_data)
-        return stats.power.TTestIndPower().power(
+        power = stats.power.TTestIndPower().power(
             effect_size=effect_size,
             nobs=min(len(control_data), len(variant_data)),
             alpha=self.alpha,
         )
+        return float(power)
 
     def _cohens_d(self, control_data: List[float], variant_data: List[float]) -> float:
         """Calculate Cohen's d effect size"""
@@ -169,7 +192,7 @@ class StatisticalAnalysisService:
 
         pooled_sd = np.sqrt(((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2))
 
-        return abs(np.mean(control_data) - np.mean(variant_data)) / pooled_sd
+        return float(abs(np.mean(control_data) - np.mean(variant_data)) / pooled_sd)
 
     def _calculate_ratio_confidence_interval(
         self, control_data: List[float], variant_data: List[float]
@@ -186,7 +209,7 @@ class StatisticalAnalysisService:
         """Estimate minimum detectable effect given a sample size"""
         analysis = stats.power.TTestIndPower()
         effect_size = analysis.solve_effect_size(nobs=sample_size, alpha=self.alpha, power=power)
-        return effect_size * np.sqrt(baseline_rate * (1 - baseline_rate))
+        return float(effect_size * np.sqrt(baseline_rate * (1 - baseline_rate)))
 
     async def calculate_sample_size(
         self, baseline_rate: float, minimum_detectable_effect: float, power: float = 0.8

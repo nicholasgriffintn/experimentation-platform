@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from uuid import uuid4
+from typing import TypedDict, List
 
 from pyiceberg.catalog import load_catalog
 from sqlalchemy.orm import Session
@@ -42,7 +43,7 @@ def get_data_service() -> IcebergDataService:
     return IcebergDataService(catalog)
 
 
-def seed_default_feature_values(db: Session):
+def seed_default_feature_values(db: Session) -> None:
     """Seed default feature values for boolean feature flags."""
 
     boolean_feature = FeatureDefinition(
@@ -60,7 +61,7 @@ def seed_default_feature_values(db: Session):
         db.commit()
 
 
-def seed_test_metrics(db: Session):
+def seed_test_metrics(db: Session) -> None:
     """Seed test metrics for experiments."""
     test_metrics = [
         MetricDefinition(
@@ -105,12 +106,24 @@ def seed_test_metrics(db: Session):
     db.commit()
 
 
-async def seed_test_experiments(db: Session):
+class GuardrailConfig(TypedDict):
+    metric: str
+    threshold: float
+    operator: str
+
+class ExperimentConfig(TypedDict):
+    exp: DBExperiment
+    variants: List[DBVariant]
+    metrics: List[str]
+    guardrails: List[GuardrailConfig]
+
+
+async def seed_test_experiments(db: Session) -> None:
     """Seed test experiments covering various use cases."""
     now = datetime.utcnow()
     data_service = get_data_service()
 
-    experiments = [
+    experiments: List[ExperimentConfig] = [
         # 1. Simple A/B Test (Draft)
         {
             "exp": DBExperiment(
@@ -312,10 +325,12 @@ async def seed_test_experiments(db: Session):
         },
     ]
 
-    for exp_data in experiments:
-        existing = db.query(DBExperiment).filter(DBExperiment.name == exp_data["exp"].name).first()
+    for exp_config in experiments:
+        existing = (
+            db.query(DBExperiment).filter(DBExperiment.name == exp_config["exp"].name).first()
+        )
         if not existing:
-            exp = exp_data["exp"]
+            exp: DBExperiment = exp_config["exp"]
             db.add(exp)
             db.flush()
 
@@ -327,15 +342,15 @@ async def seed_test_experiments(db: Session):
                 )
                 pass
 
-            for variant in exp_data["variants"]:
+            for variant in exp_config["variants"]:
                 variant.experiment_id = exp.id
                 db.add(variant)
 
-            for metric_name in exp_data["metrics"]:
+            for metric_name in exp_config["metrics"]:
                 metric = ExperimentMetric(experiment_id=exp.id, metric_name=metric_name)
                 db.add(metric)
 
-            for guardrail in exp_data["guardrails"]:
+            for guardrail in exp_config["guardrails"]:
                 guardrail_metric = GuardrailMetric(
                     experiment_id=exp.id,
                     metric_name=guardrail["metric"],
@@ -347,7 +362,7 @@ async def seed_test_experiments(db: Session):
     db.commit()
 
 
-async def seed_all(db: Session):
+async def seed_all(db: Session) -> None:
     """Run all seed functions."""
     seed_default_feature_values(db)
     seed_test_metrics(db)

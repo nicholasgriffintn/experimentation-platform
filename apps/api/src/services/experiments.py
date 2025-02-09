@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel
 
@@ -64,12 +64,30 @@ class ExperimentService:
         self.bucketing_service = bucketing_service or BucketingService()
         self.cache_service = cache_service
 
-    async def _get_experiment_config(self, experiment_id: str) -> Dict:
+    async def _get_user_variant(self, experiment_id: str, user_context: Dict) -> Optional[VariantConfig]:
+        """Get the variant assigned to a user"""
+        user_id = user_context.get("user_id")
+        if not user_id:
+            return None
+
+        if self.cache_service:
+            cached_assignment = await self.cache_service.get_variant_assignment(experiment_id, user_id)
+            if cached_assignment:
+                return VariantConfig(**cached_assignment)
+
+        config = await self._get_experiment_config(experiment_id)
+        for variant in config.get("variants", []):
+            if variant.get("id") == user_id:
+                return VariantConfig(**variant)
+
+        return None
+
+    async def _get_experiment_config(self, experiment_id: str) -> Dict[str, Any]:
         """Get experiment configuration from cache or database"""
         if self.cache_service:
             config = await self.cache_service.get_experiment_config(experiment_id)
             if config:
-                return config
+                return cast(Dict[str, Any], config)
 
         return await self.data_service.get_experiment_config(experiment_id)
 
@@ -82,7 +100,7 @@ class ExperimentService:
 
     async def assign_variant(
         self, experiment_id: str, user_context: Dict, targeting_type: str = "user_id"
-    ) -> Optional[Dict]:
+    ) -> Optional[Dict[str, Any]]:
         """Assign a variant to a user based on targeting rules"""
         user_id = user_context.get(targeting_type)
         if not user_id:
@@ -93,7 +111,7 @@ class ExperimentService:
                 experiment_id, user_id
             )
             if cached_assignment:
-                return cached_assignment
+                return cast(Dict[str, Any], cached_assignment)
 
         config = await self._get_experiment_config(experiment_id)
 
@@ -175,7 +193,7 @@ class ExperimentService:
 
     async def analyze_results(
         self, experiment_id: str, metrics: Optional[List[str]] = None
-    ) -> Dict:
+    ) -> Dict[str, Any]:
         """Analyze current experiment results with multiple testing correction"""
         config = await self._get_experiment_config(experiment_id)
         metrics_to_analyze = metrics or [m.name for m in config["metrics"]]
@@ -214,12 +232,14 @@ class ExperimentService:
                     variant_data=variant_data,
                     metric_type=config["metrics"][metric_name].type,
                     metric_name=metric_name,
+                    alpha=config.get("analysis_config", {}).get("alpha", 0.05),
+                    correction_method=config.get("analysis_config", {}).get("correction_method"),
                     method=method,
                     sequential=sequential,
                     stopping_threshold=stopping_threshold,
                 )
 
-                all_p_values.append(analysis_result.p_value)
+                all_p_values.append(analysis_result.frequentist_results.p_value)
                 variant_p_values[(metric_name, variant_id)] = len(all_p_values) - 1
                 metrics_results[metric_name][variant_id] = analysis_result
 
@@ -234,7 +254,7 @@ class ExperimentService:
             correction_method = config.get("analysis_config", {}).get(
                 "correction_method", CorrectionMethod.FDR_BH
             )
-            corrected_p_values = self.analysis_service.apply_correction(
+            corrected_p_values = self.analysis_service.correction_service.apply_correction(
                 all_p_values, method=correction_method
             )
 

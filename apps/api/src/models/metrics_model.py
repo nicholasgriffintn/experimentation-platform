@@ -15,13 +15,13 @@ class MetricEvent(BaseModel):
 
 class MetricDefinition(BaseModel):
     name: str = Field(..., description="Name of the metric")
-    description: str = Field(..., description="Description of what the metric measures")
-    unit: str = Field(..., description="Unit of measurement (e.g., '%', 'count', '$')")
+    description: Optional[str] = Field(None, description="Description of what the metric measures")
+    unit: Optional[str] = Field(None, description="Unit of measurement (e.g., '%', 'count', '$')")
     data_type: MetricType = Field(
         ..., description="Type of metric (continuous, binary, count, ratio)"
     )
     aggregation_method: str = Field(..., description="How to aggregate the metric")
-    query_template: str = Field(..., description="SQL query template for calculation")
+    query_template: Optional[str] = Field(None, description="SQL query template for calculation")
 
     class Config:
         from_attributes = True

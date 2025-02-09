@@ -37,8 +37,8 @@ class Settings(BaseSettings):
 
     # AWS/Storage Settings
     warehouse_location: str = "s3://warehouse/iceberg/"
-    aws_access_key_id: str
-    aws_secret_access_key: str
+    aws_access_key_id: str = "admin"  # Default for local development
+    aws_secret_access_key: str = "password"  # Default for local development
     aws_region: str = "us-east-1"
 
     # Cache Settings

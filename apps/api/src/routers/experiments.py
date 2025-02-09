@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -34,7 +34,7 @@ router = APIRouter()
 async def list_experiments(
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db),
-):
+) -> List[ExperimentModel]:
     """
     List all experiments in the system.
 
@@ -45,7 +45,7 @@ async def list_experiments(
         List[ExperimentModel]: A list of experiment objects with full configuration details
     """
     experiments = get_experiments_list(db)
-    return experiments
+    return [ExperimentModel.from_orm(exp) for exp in experiments]
 
 
 @router.post("/", response_model=ExperimentModel, status_code=status.HTTP_201_CREATED)
@@ -54,7 +54,7 @@ async def create_experiment(
     background_tasks: BackgroundTasks,
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db),
-):
+) -> ExperimentModel:
     """
     Create a new experiment.
 
@@ -85,10 +85,10 @@ async def create_experiment(
     db_experiment = create_experiment_in_db(experiment, db)
 
     background_tasks.add_task(
-        experiment_service.initialize_experiment, db_experiment.id, experiment.dict()
+        experiment_service.initialize_experiment, str(db_experiment.id), experiment.dict()
     )
 
-    return db_experiment
+    return ExperimentModel.from_orm(db_experiment)
 
 
 @router.get("/{experiment_id}", response_model=ExperimentModel)
@@ -96,7 +96,7 @@ async def get_experiment(
     experiment_id: str,
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db),
-):
+) -> ExperimentModel:
     """
     Get a specific experiment by ID.
 
@@ -114,7 +114,8 @@ async def get_experiment(
     Raises:
         ResourceNotFoundError: If experiment not found
     """
-    return get_experiment_from_db(experiment_id, db)
+    db_experiment = get_experiment_from_db(experiment_id, db)
+    return ExperimentModel.from_orm(db_experiment)
 
 
 @router.post("/{experiment_id}/assign", response_model=VariantAssignment)
@@ -123,7 +124,7 @@ async def assign_variant(
     user_context: UserContext,
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db),
-):
+) -> VariantAssignment:
     """
     Assign a variant to a user.
 
@@ -162,9 +163,9 @@ async def assign_variant(
 
     return VariantAssignment(
         experiment_id=experiment_id,
-        variant_id=variant.id,
-        variant_name=variant.name,
-        config=variant.config,
+        variant_id=str(variant.get("id")),
+        variant_name=str(variant.get("name")),
+        config=variant.get("config", {}),
     )
 
 
@@ -172,10 +173,10 @@ async def assign_variant(
 async def record_exposure(
     experiment_id: str,
     user_context: UserContext,
-    metadata: Optional[Dict] = None,
+    metadata: Optional[Dict[str, Any]] = None,
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db),
-):
+) -> Dict[str, str]:
     """
     Record an exposure event for an experiment.
 
@@ -211,7 +212,7 @@ async def record_metric(
     metric_event: MetricEvent,
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db),
-):
+) -> Dict[str, str]:
     """
     Record a metric event for an experiment.
 
@@ -260,7 +261,7 @@ async def get_results(
     metrics: Optional[List[str]] = None,
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db),
-):
+) -> ExperimentResults:
     """
     Get experiment results and analysis.
 
@@ -286,8 +287,16 @@ async def get_results(
     get_experiment_from_db(experiment_id, db)
 
     results = await experiment_service.analyze_results(experiment_id=experiment_id, metrics=metrics)
-
-    return results
+    
+    return ExperimentResults(
+        experiment_id=results["experiment_id"],
+        status=results["status"],
+        start_time=results["start_time"],
+        end_time=results["end_time"],
+        total_users=results["total_users"],
+        metrics=results["metrics"],
+        guardrail_violations=None,
+    )
 
 
 @router.put("/{experiment_id}/schedule")
@@ -296,7 +305,7 @@ async def update_schedule(
     schedule: ExperimentSchedule,
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db),
-):
+) -> Dict[str, str]:
     """
     Update an experiment's schedule.
 
@@ -323,15 +332,21 @@ async def update_schedule(
     """
     db_experiment = get_experiment_from_db(experiment_id, db)
 
-    db_experiment.start_time = schedule.start_time
-    db_experiment.end_time = schedule.end_time
-    db_experiment.ramp_up_period = schedule.ramp_up_period
-    db_experiment.auto_stop_conditions = (
-        schedule.auto_stop_conditions.dict() if schedule.auto_stop_conditions else None
-    )
+    if schedule.start_time is not None:
+        db_experiment.start_time = schedule.start_time
+    if schedule.end_time is not None:
+        db_experiment.end_time = schedule.end_time
+    if schedule.ramp_up_period is not None:
+        db_experiment.ramp_up_period = schedule.ramp_up_period
+    if schedule.auto_stop_conditions is not None:
+        db_experiment.auto_stop_conditions = schedule.auto_stop_conditions
+
     db.commit()
 
-    await experiment_service.update_schedule(experiment_id=experiment_id, schedule=schedule.dict())
+    await experiment_service.update_schedule(
+        experiment_id=experiment_id,
+        schedule=schedule.model_dump(),
+    )
 
     return {"status": "success"}
 
@@ -342,7 +357,7 @@ async def stop_experiment(
     reason: Optional[str] = None,
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db),
-):
+) -> Dict[str, str]:
     """
     Stop an active experiment.
 
@@ -367,9 +382,9 @@ async def stop_experiment(
     """
     db_experiment = get_active_experiment(experiment_id, db)
 
-    db_experiment.status = ExperimentStatus.STOPPED
-    db_experiment.ended_at = datetime.utcnow()
-    db_experiment.stopped_reason = reason
+    setattr(db_experiment, "status", ExperimentStatus.STOPPED)
+    setattr(db_experiment, "ended_at", datetime.utcnow())
+    setattr(db_experiment, "stopped_reason", reason)
     db.commit()
 
     await experiment_service.stop_experiment(experiment_id=experiment_id, reason=reason)
@@ -383,7 +398,7 @@ async def pause_experiment(
     reason: Optional[str] = None,
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db),
-):
+) -> Dict[str, str]:
     """
     Pause a running experiment.
 
@@ -408,7 +423,7 @@ async def pause_experiment(
     """
     db_experiment = get_active_experiment(experiment_id, db)
 
-    db_experiment.status = ExperimentStatus.PAUSED
+    setattr(db_experiment, "status", ExperimentStatus.PAUSED)
     db.commit()
 
     await experiment_service.pause_experiment(experiment_id=experiment_id, reason=reason)
@@ -421,7 +436,7 @@ async def resume_experiment(
     experiment_id: str,
     experiment_service: ExperimentService = Depends(get_experiment_service),
     db: Session = Depends(get_db),
-):
+) -> Dict[str, str]:
     """Resume a paused experiment"""
     experiment = get_experiment_from_db(experiment_id, db)
 
@@ -431,7 +446,7 @@ async def resume_experiment(
             details={"experiment_id": experiment_id, "current_status": experiment.status},
         )
 
-    experiment.status = ExperimentStatus.RUNNING
+    setattr(experiment, "status", ExperimentStatus.RUNNING)
     db.commit()
 
     await experiment_service.resume_experiment(experiment_id=experiment_id)
@@ -554,7 +569,6 @@ def create_experiment_in_db(experiment: ExperimentCreate, db: Session) -> DBExpe
             "variants",
             "metrics",
             "guardrail_metrics",
-            "metrics",
             "schedule",
             "analysis_config",
         }
@@ -567,11 +581,8 @@ def create_experiment_in_db(experiment: ExperimentCreate, db: Session) -> DBExpe
         experiment_data["start_time"] = experiment.schedule.start_time
         experiment_data["end_time"] = experiment.schedule.end_time
         experiment_data["ramp_up_period"] = experiment.schedule.ramp_up_period
-        experiment_data["auto_stop_conditions"] = (
-            experiment.schedule.auto_stop_conditions.dict()
-            if experiment.schedule.auto_stop_conditions
-            else None
-        )
+        if experiment.schedule.auto_stop_conditions:
+            experiment_data["auto_stop_conditions"] = experiment.schedule.auto_stop_conditions
 
     if experiment.analysis_config:
         experiment_data["analysis_method"] = experiment.analysis_config.method
@@ -583,10 +594,7 @@ def create_experiment_in_db(experiment: ExperimentCreate, db: Session) -> DBExpe
         experiment_data["prior_trials"] = experiment.analysis_config.prior_trials
         experiment_data["num_samples"] = experiment.analysis_config.num_samples
         if experiment.analysis_config.default_metric_config:
-            experiment_data["default_metric_config"] = {
-                "min_effect_size": experiment.analysis_config.default_metric_config.min_effect_size,
-                "min_sample_size": experiment.analysis_config.default_metric_config.min_sample_size,
-            }
+            experiment_data["default_metric_config"] = experiment.analysis_config.default_metric_config.model_dump()
 
     db_experiment = DBExperiment(**experiment_data)
     db.add(db_experiment)
@@ -604,7 +612,8 @@ def create_experiment_in_db(experiment: ExperimentCreate, db: Session) -> DBExpe
 
     for metric_name in experiment.metrics:
         experiment_metric = DBExperimentMetric(
-            experiment_id=db_experiment.id, metric_name=metric_name
+            experiment_id=db_experiment.id,
+            metric_name=metric_name,
         )
         db.add(experiment_metric)
 
@@ -623,7 +632,7 @@ def create_experiment_in_db(experiment: ExperimentCreate, db: Session) -> DBExpe
     return db_experiment
 
 
-async def validate_feature_flag_experiment(experiment: ExperimentCreate, db: Session):
+async def validate_feature_flag_experiment(experiment: ExperimentCreate, db: Session) -> None:
     """
     Validate feature flag experiment configuration against defined features.
 

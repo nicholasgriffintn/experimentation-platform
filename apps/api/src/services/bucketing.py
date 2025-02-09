@@ -82,21 +82,21 @@ class BucketingService:
             scale_factor = 100 / total_allocation
             cumulative = 0
             for variant in variants:
-                variant_buckets = (
-                    variant.traffic_percentage * scale_factor / 100
-                ) * self.bucket_count
+                variant_buckets = int(
+                    (variant.traffic_percentage * scale_factor / 100) * self.bucket_count
+                )
                 upper_bound = cumulative + variant_buckets
                 if bucket < upper_bound:
                     return variant
                 cumulative = upper_bound
-        else:
-            cumulative = 0
-            for variant in variants:
-                variant_buckets = (variant.traffic_percentage / 100) * self.bucket_count
-                upper_bound = cumulative + variant_buckets
-                if bucket < upper_bound:
-                    return variant
-                cumulative = upper_bound
+
+        cumulative = 0
+        for variant in variants:
+            variant_buckets = int((variant.traffic_percentage / 100) * self.bucket_count)
+            upper_bound = cumulative + variant_buckets
+            if bucket < upper_bound:
+                return variant
+            cumulative = upper_bound
 
         return variants[0] if variants else None
 

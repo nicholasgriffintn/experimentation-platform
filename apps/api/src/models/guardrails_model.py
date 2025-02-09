@@ -20,7 +20,7 @@ class GuardrailMetricBase(BaseModel):
     description: Optional[str] = None
 
     @validator("threshold")
-    def validate_threshold(cls, v):
+    def validate_threshold(cls, v: float | int) -> float:
         if not isinstance(v, (int, float)):
             raise ValueError("Threshold must be a number")
         return float(v)

@@ -69,7 +69,7 @@ scheduler = None
 
 
 @app.on_event("startup")
-async def startup_event():
+async def startup_event() -> None:
     """Initialize services on startup."""
     if settings.scheduler_enabled:
         logger.info("Starting scheduler")
@@ -88,7 +88,7 @@ async def startup_event():
 
 
 @app.on_event("shutdown")
-async def shutdown_event():
+async def shutdown_event() -> None:
     """Clean up services on shutdown."""
     if scheduler:
         logger.info("Stopping scheduler")
@@ -96,7 +96,7 @@ async def shutdown_event():
 
 
 @app.get("/health", tags=["system"])
-async def health_check():
+async def health_check() -> dict:
     """
     Health check endpoint for monitoring and load balancers.
 

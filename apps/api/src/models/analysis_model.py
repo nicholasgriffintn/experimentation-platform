@@ -30,7 +30,7 @@ class AnalysisConfig(BaseModel):
     num_samples: Optional[int] = Field(default=10000, ge=1000)
 
     @model_validator(mode="after")
-    def validate_bayesian_params(self):
+    def validate_bayesian_params(self) -> "AnalysisConfig":
         if self.method == AnalysisMethod.BAYESIAN:
             if self.prior_successes is None or self.prior_trials is None:
                 raise ValueError("Bayesian analysis requires prior_successes and prior_trials")

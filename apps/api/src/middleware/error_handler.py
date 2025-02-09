@@ -1,7 +1,7 @@
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union, Callable, Awaitable
 
 from fastapi import Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.exc import SQLAlchemyError
 
 from ..utils.logger import logger
@@ -14,7 +14,7 @@ class ExperimentationError(Exception):
         self,
         message: str,
         status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
-        details: Dict[str, Any] = None,
+        details: Optional[Dict[str, Any]] = None,
     ):
         self.message = message
         self.status_code = status_code
@@ -25,7 +25,7 @@ class ExperimentationError(Exception):
 class ValidationError(ExperimentationError):
     """Validation error"""
 
-    def __init__(self, message: str, details: Dict[str, Any] = None):
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
         super().__init__(message=message, status_code=status.HTTP_400_BAD_REQUEST, details=details)
 
 
@@ -40,7 +40,10 @@ class ResourceNotFoundError(ExperimentationError):
         )
 
 
-async def error_handler(request: Request, call_next):
+async def error_handler(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
     """Global error handling middleware"""
     try:
         return await call_next(request)

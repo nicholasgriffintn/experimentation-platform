@@ -53,7 +53,6 @@
         <textarea
             id="description"
             bind:value={description}
-            required
             disabled={loading}
             class="w-full px-3 py-2 border rounded-md"
             rows="3"
@@ -67,7 +66,6 @@
             type="text"
             id="unit"
             bind:value={unit}
-            required
             disabled={loading}
             class="w-full px-3 py-2 border rounded-md"
             placeholder="e.g., percentage, count, dollars"
@@ -115,7 +113,6 @@
         <textarea
             id="query_template"
             bind:value={query_template}
-            required
             disabled={loading}
             class="w-full px-3 py-2 border rounded-md font-mono text-sm"
             rows="5"
