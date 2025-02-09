@@ -123,6 +123,7 @@ class ExperimentCreate(ExperimentBase):
 class Experiment(ExperimentBase):
     id: str = Field(..., description="Unique identifier for the experiment")
     status: ExperimentStatus = Field(default=ExperimentStatus.DRAFT)
+    traffic_allocation: float = Field(default=100.0, description="Percentage of eligible traffic included in experiment")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     started_at: Optional[datetime] = None
@@ -164,6 +165,11 @@ class Experiment(ExperimentBase):
                     'ramp_up_period': data.ramp_up_period if hasattr(data, 'ramp_up_period') else None,
                     'auto_stop_conditions': data.auto_stop_conditions if hasattr(data, 'auto_stop_conditions') else None
                 }
+
+            if hasattr(data, 'traffic_allocation'):
+                data_dict['traffic_allocation'] = data.traffic_allocation
+            else:
+                data_dict['traffic_allocation'] = 100.0
             
             if '_sa_instance_state' in data_dict:
                 del data_dict['_sa_instance_state']

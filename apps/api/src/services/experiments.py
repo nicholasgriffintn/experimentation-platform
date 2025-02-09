@@ -86,6 +86,9 @@ class ExperimentService:
             return None
 
         assignment_key = self._get_assignment_key(user_context, targeting_type)
+        if not self._is_user_in_experiment(assignment_key, config.get('traffic_allocation', 100)):
+            return None
+
         variant = await self._get_consistent_assignment(
             experiment_id,
             assignment_key,
@@ -100,6 +103,37 @@ class ExperimentService:
         )
 
         return variant
+
+    def _is_user_in_experiment(self, assignment_key: str, traffic_allocation: float) -> bool:
+        """Determine if a user should be included in the experiment based on traffic allocation"""
+        import hashlib
+        
+        hash_input = f"traffic_allocation:{assignment_key}".encode()
+        hash_value = int(hashlib.sha256(hash_input).hexdigest(), 16)
+        normalized_hash = hash_value / 2**256
+        
+        return normalized_hash < (traffic_allocation / 100)
+
+    async def _get_consistent_assignment(
+        self,
+        experiment_id: str,
+        assignment_key: str,
+        variants: List[VariantConfig]
+    ) -> VariantConfig:
+        """Get consistent variant assignment based on hash"""
+        import hashlib
+        
+        hash_input = f"{experiment_id}:{assignment_key}".encode()
+        hash_value = int(hashlib.sha256(hash_input).hexdigest(), 16)
+        normalized_hash = hash_value / 2**256
+        
+        cumulative_split = 0
+        for variant in variants:
+            cumulative_split += variant.traffic_percentage / 100
+            if normalized_hash < cumulative_split:
+                return variant
+                
+        return variants[-1]
 
     async def record_exposure(
         self,
@@ -199,28 +233,6 @@ class ExperimentService:
             if user_context[rule_key] != rule_value:
                 return False
         return True
-
-    async def _get_consistent_assignment(
-        self,
-        experiment_id: str,
-        assignment_key: str,
-        variants: List[VariantConfig]
-    ) -> VariantConfig:
-        """Get consistent variant assignment based on hash"""
-        import hashlib
-        
-        hash_input = f"{experiment_id}:{assignment_key}".encode()
-        hash_value = int(hashlib.sha256(hash_input).hexdigest(), 16)
-        
-        normalized_hash = hash_value / 2**256
-        
-        cumulative_split = 0
-        for variant in variants:
-            cumulative_split += variant.traffic_percentage
-            if normalized_hash < cumulative_split:
-                return variant
-                
-        return variants[-1]
 
     async def _get_metric_data(
         self,

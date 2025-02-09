@@ -50,18 +50,24 @@ class ExperimentScheduler:
                 experiment.start_time <= now):
                 await self.start_experiment(experiment)
             
-            elif (experiment.status == ExperimentStatus.RUNNING and 
-                  experiment.end_time and 
-                  experiment.end_time <= now):
-                await self.stop_experiment(experiment)
-            
-            elif experiment.status == ExperimentStatus.RUNNING:
+            elif (experiment.status == ExperimentStatus.RUNNING):
+                if experiment.end_time and experiment.end_time <= now:
+                    await self.stop_experiment(experiment)
+                    continue
+
                 await self.check_guardrails(experiment)
+
+                if experiment.auto_stop_conditions:
+                    await self.check_auto_stop_conditions(experiment)
 
     async def start_experiment(self, experiment: Experiment):
         """Start an experiment and schedule automated analysis if needed"""
         try:
-            experiment.status = ExperimentStatus.RUNNING
+            if experiment.ramp_up_period:
+                await self._apply_ramp_up_traffic(experiment)
+            else:
+                experiment.status = ExperimentStatus.RUNNING
+
             experiment.started_at = datetime.utcnow()
             self.db.commit()
             
@@ -71,6 +77,99 @@ class ExperimentScheduler:
         except Exception as e:
             self.db.rollback()
             print(f"Error starting experiment {experiment.id}: {str(e)}")
+
+    async def _apply_ramp_up_traffic(self, experiment: Experiment):
+        """Apply initial traffic allocation for ramp-up"""
+        try:
+            initial_traffic_percentage = 10
+            experiment.traffic_allocation = initial_traffic_percentage
+            experiment.status = ExperimentStatus.RUNNING
+            self.db.commit()
+
+            total_hours = experiment.ramp_up_period
+            steps = 5
+            hours_per_step = total_hours / steps
+
+            for step in range(1, steps + 1):
+                self.scheduled_tasks[f"{experiment.id}_rampup_{step}"] = asyncio.create_task(
+                    self._schedule_traffic_increase(
+                        experiment_id=experiment.id,
+                        delay_hours=hours_per_step * step,
+                        target_percentage=initial_traffic_percentage + 
+                            ((100 - initial_traffic_percentage) * step / steps)
+                    )
+                )
+
+        except Exception as e:
+            print(f"Error applying ramp-up for experiment {experiment.id}: {str(e)}")
+            raise
+
+    async def _schedule_traffic_increase(self, experiment_id: str, delay_hours: float, target_percentage: float):
+        """Schedule a traffic increase after a delay"""
+        await asyncio.sleep(delay_hours * 3600)
+        
+        experiment = self.db.query(Experiment).filter(
+            Experiment.id == experiment_id,
+            Experiment.status == ExperimentStatus.RUNNING
+        ).first()
+        
+        if experiment:
+            try:
+                experiment.traffic_allocation = target_percentage
+                self.db.commit()
+                
+                await self.experiment_service.record_event(
+                    experiment_id=experiment_id,
+                    event_data={
+                        'event_type': 'traffic_allocation_update',
+                        'traffic_allocation': target_percentage
+                    }
+                )
+            except Exception as e:
+                print(f"Error increasing traffic for experiment {experiment_id}: {str(e)}")
+
+    async def check_auto_stop_conditions(self, experiment: Experiment):
+        """Check if any auto-stop conditions are met"""
+        conditions = experiment.auto_stop_conditions
+        if not conditions:
+            return
+
+        try:
+            if 'min_sample_size' in conditions:
+                sample_size = await self._get_experiment_sample_size(experiment)
+                if sample_size >= conditions['min_sample_size']:
+                    await self.stop_experiment(experiment, reason="Reached target sample size")
+                    return
+
+            if 'significance_threshold' in conditions:
+                results = await self.experiment_service.analyze_results(experiment.id)
+                for metric_results in results.get('metrics', {}).values():
+                    for result in metric_results.values():
+                        if result.get('p_value', 1) <= conditions['significance_threshold']:
+                            await self.stop_experiment(
+                                experiment, 
+                                reason=f"Reached statistical significance (p-value: {result['p_value']})"
+                            )
+                            return
+
+            if 'max_duration_hours' in conditions:
+                duration = datetime.utcnow() - experiment.started_at
+                if duration.total_seconds() / 3600 >= conditions['max_duration_hours']:
+                    await self.stop_experiment(experiment, reason="Reached maximum duration")
+                    return
+
+        except Exception as e:
+            print(f"Error checking auto-stop conditions for experiment {experiment.id}: {str(e)}")
+
+    async def _get_experiment_sample_size(self, experiment: Experiment) -> int:
+        """Get the current sample size of the experiment"""
+        try:
+            # TODO: Implement actual sample size calculation
+            exposure_data = await self.experiment_service.data_service.get_exposure_data(experiment.id)
+            return len(exposure_data)
+        except Exception as e:
+            print(f"Error getting sample size for experiment {experiment.id}: {str(e)}")
+            return 0
 
     async def stop_experiment(self, experiment: Experiment):
         """Stop an experiment and run final analysis"""

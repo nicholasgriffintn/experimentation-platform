@@ -208,6 +208,14 @@
 										</div>
 									</div>
 								{/if}
+								{#if experiment.traffic_allocation}
+									<div>
+										<span class="font-medium">Traffic Allocation:</span>
+										<div class="mt-1 text-gray-600">
+										{experiment.traffic_allocation.toFixed(1)}% of eligible traffic
+										</div>
+									</div>
+								{/if}
 							</div>
 						</div>
 					{:else}

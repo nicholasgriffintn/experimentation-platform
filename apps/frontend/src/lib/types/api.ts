@@ -48,6 +48,7 @@ export interface ExperimentCreate {
 export interface Experiment extends ExperimentCreate {
     id: string;
     status: 'draft' | 'scheduled' | 'running' | 'paused' | 'completed' | 'stopped';
+    traffic_allocation: number;
     created_at: string;
     updated_at: string;
     started_at?: string;
