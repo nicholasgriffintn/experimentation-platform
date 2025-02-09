@@ -83,6 +83,15 @@ class ExperimentService:
         targeting_type: str = "user_id"
     ) -> Optional[Dict]:
         """Assign a variant to a user based on targeting rules"""
+        user_id = user_context.get(targeting_type)
+        if not user_id:
+            return None
+
+        if self.cache_service:
+            cached_assignment = await self.cache_service.get_variant_assignment(experiment_id, user_id)
+            if cached_assignment:
+                return cached_assignment
+
         config = await self._get_experiment_config(experiment_id)
         
         if not self._meets_targeting_rules(user_context, config.get('targeting_rules', {})):
@@ -93,7 +102,7 @@ class ExperimentService:
             return None
 
         variant = self.bucketing_service.assign_variant(
-            user_id=assignment_key,
+            user_id=user_id,
             experiment_id=experiment_id,
             variants=config['variants'],
             experiment_type=config['type'],
@@ -103,10 +112,17 @@ class ExperimentService:
         if variant:
             await self.data_service.assign_variant(
                 experiment_id=experiment_id,
-                user_id=user_context.get('user_id'),
+                user_id=user_id,
                 variant_id=variant.id,
                 context=user_context
             )
+            
+            if self.cache_service:
+                await self.cache_service.set_variant_assignment(
+                    experiment_id=experiment_id,
+                    user_id=user_id,
+                    assignment=variant.dict()
+                )
 
         return variant.dict() if variant else None
 
@@ -174,6 +190,12 @@ class ExperimentService:
         variant_p_values = {}
         
         for metric_name in metrics_to_analyze:
+            if self.cache_service:
+                cached_stats = await self.cache_service.get_metric_stats(experiment_id, metric_name)
+                if cached_stats:
+                    metrics_results[metric_name] = cached_stats
+                    continue
+
             metric_data = await self._get_metric_data(experiment_id, metric_name)
             metrics_results[metric_name] = {}
             
@@ -204,6 +226,13 @@ class ExperimentService:
                 all_p_values.append(analysis_result.p_value)
                 variant_p_values[(metric_name, variant_id)] = len(all_p_values) - 1
                 metrics_results[metric_name][variant_id] = analysis_result
+
+                if self.cache_service:
+                    await self.cache_service.set_metric_stats(
+                        experiment_id=experiment_id,
+                        metric_name=metric_name,
+                        stats=metrics_results[metric_name]
+                    )
 
         if len(all_p_values) > 1:
             correction_method = config.get('analysis_config', {}).get(

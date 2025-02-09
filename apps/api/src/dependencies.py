@@ -7,6 +7,7 @@ from .services.experiments import ExperimentService
 from .services.analysis import StatisticalAnalysisService, BayesianAnalysisService, MultipleTestingCorrection, CombinedAnalysisService
 from .services.data import IcebergDataService
 from .services.scheduler import ExperimentScheduler
+from .services.cache import RedisCache, CacheService
 from .config.app import settings
 from .config.iceberg import IcebergConfig, create_catalog
 
@@ -50,15 +51,24 @@ def get_analysis_service(
         correction_service=correction_service
     )
 
+@lru_cache
+def get_cache_service() -> CacheService:
+    """Get cached CacheService instance."""
+    redis_cache = RedisCache(settings.redis_url)
+    return CacheService(redis_cache)
+
+@lru_cache
 def get_experiment_service(
     db: Session = Depends(get_db),
-    iceberg_service: IcebergDataService = Depends(get_iceberg_service),
-    analysis_service: CombinedAnalysisService = Depends(get_analysis_service)
+    data_service: IcebergDataService = Depends(get_iceberg_service),
+    analysis_service: CombinedAnalysisService = Depends(get_analysis_service),
+    cache_service: CacheService = Depends(get_cache_service)
 ) -> ExperimentService:
-    """Get ExperimentService instance."""
+    """Get ExperimentService instance with all dependencies."""
     return ExperimentService(
-        data_service=iceberg_service,
-        analysis_service=analysis_service
+        data_service=data_service,
+        analysis_service=analysis_service,
+        cache_service=cache_service
     )
 
 def get_scheduler(
