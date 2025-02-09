@@ -26,6 +26,7 @@ from ..db.base import (
     FeatureDefinition as DBFeatureDefinition
 )
 from ..dependencies import get_experiment_service
+from ..middleware.error_handler import ValidationError, ResourceNotFoundError
 
 router = APIRouter()
 
@@ -112,7 +113,7 @@ async def get_experiment(
         ExperimentModel: The requested experiment with full configuration details
 
     Raises:
-        HTTPException: 404 if experiment not found
+        ResourceNotFoundError: If experiment not found
     """
     return get_experiment(experiment_id, db)
 
@@ -143,9 +144,9 @@ async def assign_variant(
         VariantAssignment: The assigned variant details including configuration
 
     Raises:
-        HTTPException: 404 if experiment not found
-        HTTPException: 400 if experiment is not running
-        HTTPException: 400 if user does not meet targeting criteria
+        ResourceNotFoundError: If experiment not found
+        ValidationError: If experiment is not running
+        ValidationError: If user does not meet targeting criteria
     """
     db_experiment = get_active_experiment(experiment_id, db)
     
@@ -155,9 +156,12 @@ async def assign_variant(
     )
     
     if not variant:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User does not meet targeting criteria"
+        raise ValidationError(
+            "User does not meet targeting criteria",
+            details={
+                "experiment_id": experiment_id,
+                "user_context": user_context
+            }
         )
     
     return VariantAssignment(
@@ -192,8 +196,8 @@ async def record_exposure(
         dict: Success status
 
     Raises:
-        HTTPException: 404 if experiment not found
-        HTTPException: 400 if experiment is not running
+        ResourceNotFoundError: If experiment not found
+        ValidationError: If experiment is not running
     """
     db_experiment = get_active_experiment(experiment_id, db)
     
@@ -232,16 +236,18 @@ async def record_metric(
         dict: Success status
 
     Raises:
-        HTTPException: 404 if experiment not found
-        HTTPException: 400 if experiment is not running
-        HTTPException: 400 if metric is not configured for this experiment
+        ResourceNotFoundError: If experiment not found
+        ValidationError: If experiment is not running or metric is not configured
     """
     db_experiment = get_active_experiment(experiment_id, db)
     
     if not is_valid_experiment_metric(experiment_id, metric_event.metric_name, db):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Metric {metric_event.metric_name} is not configured for this experiment"
+        raise ValidationError(
+            f"Metric {metric_event.metric_name} is not configured for this experiment",
+            details={
+                "experiment_id": experiment_id,
+                "metric_name": metric_event.metric_name
+            }
         )
     
     await experiment_service.record_metric(
@@ -281,7 +287,7 @@ async def get_results(
         ExperimentResults: Detailed results and analysis for the experiment
 
     Raises:
-        HTTPException: 404 if experiment not found
+        ResourceNotFoundError: If experiment not found
     """
     db_experiment = get_experiment(experiment_id, db)
     
@@ -321,7 +327,7 @@ async def update_schedule(
         dict: Success status
 
     Raises:
-        HTTPException: 404 if experiment not found
+        ResourceNotFoundError: If experiment not found
     """
     db_experiment = get_experiment(experiment_id, db)
     
@@ -364,8 +370,8 @@ async def stop_experiment(
         dict: Success status
 
     Raises:
-        HTTPException: 404 if experiment not found
-        HTTPException: 400 if experiment is not in running state
+        ResourceNotFoundError: If experiment not found
+        ValidationError: If experiment is not in running state
     """
     db_experiment = get_active_experiment(experiment_id, db)
     
@@ -407,8 +413,8 @@ async def pause_experiment(
         dict: Success status
 
     Raises:
-        HTTPException: 404 if experiment not found
-        HTTPException: 400 if experiment is not in running state
+        ResourceNotFoundError: If experiment not found
+        ValidationError: If experiment is not in running state
     """
     db_experiment = get_active_experiment(experiment_id, db)
     
@@ -432,9 +438,12 @@ async def resume_experiment(
     experiment = get_experiment(experiment_id, db)
     
     if experiment.status != ExperimentStatus.PAUSED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Experiment {experiment_id} is not paused"
+        raise ValidationError(
+            f"Experiment {experiment_id} is not paused",
+            details={
+                "experiment_id": experiment_id,
+                "current_status": experiment.status
+            }
         )
     
     experiment.status = ExperimentStatus.RUNNING
@@ -473,7 +482,7 @@ def get_experiment(experiment_id: str, db: Session) -> DBExperiment:
     Get a specific experiment by ID or raise 404.
 
     Retrieves a single experiment with its related entities using eager loading.
-    Raises an HTTP 404 exception if the experiment is not found.
+    Raises ResourceNotFoundError if the experiment is not found.
 
     Args:
         experiment_id: The ID of the experiment to retrieve
@@ -483,7 +492,7 @@ def get_experiment(experiment_id: str, db: Session) -> DBExperiment:
         DBExperiment: The requested experiment with its related entities
 
     Raises:
-        HTTPException: 404 if experiment not found
+        ResourceNotFoundError: If experiment not found
     """
     experiment = db.query(DBExperiment).options(
         joinedload(DBExperiment.variants),
@@ -492,10 +501,7 @@ def get_experiment(experiment_id: str, db: Session) -> DBExperiment:
     ).filter(DBExperiment.id == experiment_id).first()
     
     if not experiment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Experiment {experiment_id} not found"
-        )
+        raise ResourceNotFoundError("Experiment", experiment_id)
     
     return experiment
 
@@ -504,7 +510,7 @@ def get_active_experiment(experiment_id: str, db: Session) -> DBExperiment:
     Get a running experiment or raise error.
 
     Retrieves an experiment and verifies it is in the running state.
-    Raises appropriate HTTP exceptions if the experiment is not found
+    Raises appropriate errors if the experiment is not found
     or not in the running state.
 
     Args:
@@ -515,14 +521,17 @@ def get_active_experiment(experiment_id: str, db: Session) -> DBExperiment:
         DBExperiment: The requested running experiment
 
     Raises:
-        HTTPException: 404 if experiment not found
-        HTTPException: 400 if experiment is not running
+        ResourceNotFoundError: If experiment not found
+        ValidationError: If experiment is not running
     """
     experiment = get_experiment(experiment_id, db)
     if experiment.status != ExperimentStatus.RUNNING:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Experiment {experiment_id} is not running"
+        raise ValidationError(
+            f"Experiment {experiment_id} is not running",
+            details={
+                "experiment_id": experiment_id,
+                "current_status": experiment.status
+            }
         )
     return experiment
 
@@ -619,35 +628,43 @@ async def validate_feature_flag_experiment(experiment: ExperimentCreate, db: Ses
         db: Database session
         
     Raises:
-        HTTPException: If feature validation fails
+        ValidationError: If feature validation fails
     """
     if experiment.type != ExperimentType.FEATURE_FLAG:
         return
 
     feature_name = experiment.parameters.get('feature_name')
     if not feature_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Feature flag experiments must specify feature_name in parameters"
+        raise ValidationError(
+            "Feature flag experiments must specify feature_name in parameters",
+            details={"parameters": experiment.parameters}
         )
 
     feature = db.query(DBFeatureDefinition).filter(DBFeatureDefinition.name == feature_name).first()
     if not feature:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Feature {feature_name} is not defined. Create it first using the features API."
+        raise ValidationError(
+            f"Feature {feature_name} is not defined. Create it first using the features API.",
+            details={"feature_name": feature_name}
         )
 
     for variant in experiment.variants:
         config_value = variant.config.get('value')
         if config_value is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Variant {variant.name} must specify a 'value' in config"
+            raise ValidationError(
+                f"Variant {variant.name} must specify a 'value' in config",
+                details={
+                    "variant_name": variant.name,
+                    "variant_config": variant.config
+                }
             )
         
         if config_value not in feature.possible_values:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Value {config_value} for variant {variant.name} is not in allowed values for feature {feature_name}: {feature.possible_values}"
+            raise ValidationError(
+                f"Value {config_value} for variant {variant.name} is not in allowed values for feature {feature_name}",
+                details={
+                    "variant_name": variant.name,
+                    "value": config_value,
+                    "allowed_values": feature.possible_values,
+                    "feature_name": feature_name
+                }
             )

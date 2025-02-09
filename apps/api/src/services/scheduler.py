@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from ..db.base import Experiment
 from ..models.experiment import ExperimentStatus, GuardrailMetric, AnalysisMethod
 from .experiments import ExperimentService
+from ..utils.logger import logger
 
 class ExperimentScheduler:
     def __init__(
@@ -76,7 +77,7 @@ class ExperimentScheduler:
             
         except Exception as e:
             self.db.rollback()
-            print(f"Error starting experiment {experiment.id}: {str(e)}")
+            logger.error(f"Error starting experiment {experiment.id}: {str(e)}")
 
     async def _apply_ramp_up_traffic(self, experiment: Experiment):
         """Apply initial traffic allocation for ramp-up"""
@@ -102,6 +103,7 @@ class ExperimentScheduler:
 
         except Exception as e:
             print(f"Error applying ramp-up for experiment {experiment.id}: {str(e)}")
+            logger.error(f"Error applying ramp-up for experiment {experiment.id}: {str(e)}")
             raise
 
     async def _schedule_traffic_increase(self, experiment_id: str, delay_hours: float, target_percentage: float):
@@ -126,7 +128,7 @@ class ExperimentScheduler:
                     }
                 )
             except Exception as e:
-                print(f"Error increasing traffic for experiment {experiment_id}: {str(e)}")
+                logger.error(f"Error increasing traffic for experiment {experiment_id}: {str(e)}")
 
     async def check_auto_stop_conditions(self, experiment: Experiment):
         """Check if any auto-stop conditions are met"""
@@ -190,7 +192,7 @@ class ExperimentScheduler:
                     return
 
         except Exception as e:
-            print(f"Error checking auto-stop conditions for experiment {experiment.id}: {str(e)}")
+            logger.error(f"Error checking auto-stop conditions for experiment {experiment.id}: {str(e)}")
 
     async def _get_experiment_sample_size(self, experiment: Experiment) -> int:
         """
@@ -221,7 +223,7 @@ class ExperimentScheduler:
             return min(len(users) for users in variant_sizes.values())
             
         except Exception as e:
-            print(f"Error getting sample size for experiment {experiment.id}: {str(e)}")
+            logger.error(f"Error getting sample size for experiment {experiment.id}: {str(e)}")
             return 0
 
     async def stop_experiment(
@@ -252,7 +254,7 @@ class ExperimentScheduler:
             
         except Exception as e:
             self.db.rollback()
-            print(f"Error stopping experiment {experiment.id}: {str(e)}")
+            logger.error(f"Error stopping experiment {experiment.id}: {str(e)}")
 
     async def check_guardrails(self, experiment: Experiment):
         """Check guardrail metrics for an experiment"""
@@ -267,7 +269,7 @@ class ExperimentScheduler:
                     await self.handle_guardrail_violation(experiment, guardrail)
                     
         except Exception as e:
-            print(f"Error checking guardrails for experiment {experiment.id}: {str(e)}")
+            logger.error(f"Error checking guardrails for experiment {experiment.id}: {str(e)}")
 
     def is_guardrail_violated(self, metric_data: Dict, guardrail: GuardrailMetric) -> bool:
         """Check if a guardrail metric is violated"""
@@ -302,8 +304,7 @@ class ExperimentScheduler:
             }
         )
         
-        # TODO: Implement notification system
-        print(f"Guardrail violation in experiment {experiment.id}: {guardrail.metric_name}")
+        logger.warning(f"Guardrail violation in experiment {experiment.id}: {guardrail.metric_name}")
 
     def schedule_automated_analysis(self, experiment: Experiment):
         """Schedule automated analysis for an experiment"""

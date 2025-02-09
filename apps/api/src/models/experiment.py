@@ -197,9 +197,6 @@ class Experiment(ExperimentBase):
     def convert_variants(cls, data: Any) -> Any:
         if hasattr(data, '__dict__'):
             data_dict = data.__dict__
-            print(f"Model validator:")
-            print(f"  Original data type: {type(data)}")
-            print(f"  Original data dict: {data_dict}")
             
             if 'variants' in data_dict and data_dict['variants']:
                 data_dict['variants'] = [
@@ -214,7 +211,6 @@ class Experiment(ExperimentBase):
                 ]
             
             if hasattr(data, 'metrics'):
-                print(f"  Found metrics: {data.metrics}")
                 data_dict['metrics'] = [metric.metric_name for metric in data.metrics] if data.metrics else []
             
             if hasattr(data, 'start_time') and data.start_time:

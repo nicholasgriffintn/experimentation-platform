@@ -9,6 +9,11 @@ from .db.base import Base
 from .db.session import engine
 from .services.scheduler import ExperimentScheduler
 from .db.seed import seed_all
+from .utils.logger import LogConfig, logger
+import logging.config
+from .middleware.error_handler import error_handler
+
+logging.config.dictConfig(LogConfig().dict())
 
 description = """
 This API provides a comprehensive suite of endpoints for managing and analyzing experiments and feature flags.
@@ -51,6 +56,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.middleware("http")(error_handler)
+
 Base.metadata.create_all(bind=engine)
 
 app.include_router(experiments.router, prefix="/api/v1/experiments", tags=["experiments"])
@@ -63,7 +70,7 @@ scheduler = None
 async def startup_event():
     """Initialize services on startup."""
     if settings.scheduler_enabled:
-        print("Starting scheduler")
+        logger.info("Starting scheduler")
         global scheduler
         db = next(get_db())
         experiment_service = get_experiment_service(db)
@@ -74,7 +81,7 @@ async def startup_event():
         )
         asyncio.create_task(scheduler.start())
     else:
-        print("Scheduler is disabled")
+        logger.info("Scheduler is disabled")
 
     db = next(get_db())
     await seed_all(db)
@@ -83,7 +90,7 @@ async def startup_event():
 async def shutdown_event():
     """Clean up services on shutdown."""
     if scheduler:
-        print("Stopping scheduler")
+        logger.info("Stopping scheduler")
         await scheduler.stop()
 
 @app.get("/health", tags=["system"])
@@ -104,3 +111,7 @@ async def health_check():
         "status": "healthy",
         "scheduler": "running" if scheduler and scheduler.running else "stopped"
     }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

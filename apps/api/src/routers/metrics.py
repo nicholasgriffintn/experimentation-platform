@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
 
 from ..db.session import get_db
 from ..db.base import MetricDefinition as DBMetricDefinition
 from ..models.experiment import MetricDefinition
+from ..middleware.error_handler import ValidationError, ResourceNotFoundError
 
 router = APIRouter()
 
@@ -28,13 +29,13 @@ async def create_metric(metric: MetricDefinition, db: Session = Depends(get_db))
         MetricDefinition: The created metric definition
 
     Raises:
-        HTTPException: 400 if metric with same name already exists
+        ValidationError: If metric with same name already exists
     """
     db_metric = db.query(DBMetricDefinition).filter(DBMetricDefinition.name == metric.name).first()
     if db_metric:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Metric {metric.name} already exists"
+        raise ValidationError(
+            f"Metric {metric.name} already exists",
+            details={"metric_name": metric.name}
         )
     
     db_metric = DBMetricDefinition(
@@ -56,7 +57,9 @@ async def list_metrics(db: Session = Depends(get_db)):
     List all metric definitions.
 
     Returns a list of all available metrics that can be used in experiments.
-    Each metric includes its configuration and query template.
+
+    Args:
+        db: Database session
 
     Returns:
         List[MetricDefinition]: List of all metric definitions
@@ -66,9 +69,7 @@ async def list_metrics(db: Session = Depends(get_db)):
 @router.get("/{metric_name}", response_model=MetricDefinition)
 async def get_metric(metric_name: str, db: Session = Depends(get_db)):
     """
-    Get a specific metric definition by name.
-
-    Retrieves detailed information about a single metric definition.
+    Get a specific metric definition.
 
     Args:
         metric_name (str): The name of the metric to retrieve
@@ -78,40 +79,28 @@ async def get_metric(metric_name: str, db: Session = Depends(get_db)):
         MetricDefinition: The requested metric definition
 
     Raises:
-        HTTPException: 404 if metric not found
+        ResourceNotFoundError: If metric not found
     """
-    db_metric = db.query(DBMetricDefinition).filter(DBMetricDefinition.name == metric_name).first()
-    if not db_metric:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Metric {metric_name} not found"
-        )
-    return db_metric
+    metric = db.query(DBMetricDefinition).filter(DBMetricDefinition.name == metric_name).first()
+    if not metric:
+        raise ResourceNotFoundError("Metric", metric_name)
+    return metric
 
-@router.delete("/{metric_name}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{metric_name}", status_code=204)
 async def delete_metric(metric_name: str, db: Session = Depends(get_db)):
     """
     Delete a metric definition.
-
-    Permanently removes a metric definition. Note that this will not affect historical
-    data for experiments that used this metric.
 
     Args:
         metric_name (str): The name of the metric to delete
         db: Database session
 
-    Returns:
-        None
-
     Raises:
-        HTTPException: 404 if metric not found
+        ResourceNotFoundError: If metric not found
     """
-    db_metric = db.query(DBMetricDefinition).filter(DBMetricDefinition.name == metric_name).first()
-    if not db_metric:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Metric {metric_name} not found"
-        )
-    db.delete(db_metric)
-    db.commit()
-    return None 
+    metric = db.query(DBMetricDefinition).filter(DBMetricDefinition.name == metric_name).first()
+    if not metric:
+        raise ResourceNotFoundError("Metric", metric_name)
+    
+    db.delete(metric)
+    db.commit() 

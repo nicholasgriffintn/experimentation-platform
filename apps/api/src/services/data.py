@@ -7,6 +7,7 @@ from pyiceberg.schema import Schema
 from pyiceberg.partitioning import PartitionSpec
 
 from ..schema.iceberg import IcebergSchemas
+from ..utils.logger import logger
 
 class IcebergDataService:
     def __init__(self, catalog: Catalog):
@@ -65,8 +66,8 @@ class IcebergDataService:
         try:
             try:
                 existing_table = self.catalog.load_table(table_name)
-                print(f"Table {table_name} already exists")
-                return
+                logger.info(f"Table {table_name} already exists")
+                return True
             except Exception:
                 pass
             
@@ -94,16 +95,17 @@ class IcebergDataService:
                     "read.split.open-file-cost": "4194304",  # 4MB
                 }
             )
-            print(f"Successfully created table {table_name}")
+            logger.info(f"Successfully created table {table_name}")
+            return True
         except Exception as e:
             error_msg = str(e)
-            print(f"Failed to create table {table_name}: {error_msg}")
-            if "NoSuchNamespaceException" in error_msg:
-                print(f"Namespace does not exist for table {table_name}")
-            elif "TableAlreadyExistsException" in error_msg:
-                print(f"Table {table_name} already exists (concurrent creation)")
+            if "Table already exists" in error_msg:
+                logger.info(f"Table {table_name} already exists (concurrent creation)")
+            elif "Namespace does not exist" in error_msg:
+                logger.error(f"Namespace does not exist for table {table_name}")
             else:
-                raise Exception(f"Failed to create table {table_name}: {error_msg}")
+                logger.error(f"Failed to create table {table_name}: {error_msg}")
+            return False
 
     async def get_experiment_config(self, experiment_id: str) -> Dict:
         """Get experiment configuration from database"""

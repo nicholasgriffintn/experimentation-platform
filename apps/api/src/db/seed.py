@@ -4,14 +4,16 @@ from .base import (
     Variant as DBVariant, ExperimentMetric, GuardrailMetric
 )
 from datetime import datetime, timedelta
+from pyiceberg.catalog import load_catalog
 from uuid import uuid4
+
 from ..models.experiment import (
     ExperimentType, VariantType, 
     ExperimentStatus, AnalysisMethod, CorrectionMethod
 )
 from ..services.data import IcebergDataService
-from pyiceberg.catalog import load_catalog
 from ..config.app import settings
+from ..utils.logger import logger
 
 def get_data_service() -> IcebergDataService:
     """Get initialized data service instance."""
@@ -31,11 +33,14 @@ def get_data_service() -> IcebergDataService:
                     "description": "Namespace for experiment data"
                 }
             )
-            print(f"Created {settings.iceberg_namespace} namespace")
+            logger.info(f"Created {settings.iceberg_namespace} namespace")
         else:
-            print(f"{settings.iceberg_namespace} namespace already exists")
+            logger.info(f"{settings.iceberg_namespace} namespace already exists")
     except Exception as e:
-        print(f"Warning: Failed to handle namespace: {str(e)}")
+        if "NamespaceAlreadyExistsException" in str(e):
+            logger.info(f"{settings.iceberg_namespace} namespace already exists")
+        else:
+            logger.warning(f"Failed to handle namespace: {str(e)}")
     
     return IcebergDataService(catalog)
 
@@ -324,7 +329,7 @@ async def seed_test_experiments(db: Session):
             try:
                 await data_service.initialize_experiment_tables(exp.id)
             except Exception as e:
-                print(f"Warning: Failed to initialize Iceberg tables for experiment {exp.id}: {str(e)}")
+                logger.warning(f"Failed to initialize Iceberg tables for experiment {exp.id}: {str(e)}")
                 pass
 
             for variant in exp_data["variants"]:

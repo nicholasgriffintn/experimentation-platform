@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from ..db.session import get_db
 from ..db.base import FeatureDefinition as DBFeatureDefinition
+from ..middleware.error_handler import ValidationError, ResourceNotFoundError
 
 router = APIRouter()
 
@@ -13,6 +14,7 @@ class FeatureDefinition(BaseModel):
     description: str
     data_type: str
     possible_values: List[Any]
+    default_value: Any
 
     class Config:
         from_attributes = True
@@ -22,12 +24,8 @@ async def create_feature(feature: FeatureDefinition, db: Session = Depends(get_d
     """
     Create a new feature definition.
 
-    Creates a new feature that can be used in experiments. The feature definition includes:
-    - Name and description
-    - Data type of the feature
-    - Possible values the feature can take
-
-    This is used to define what features can be experimented with and what values they can have.
+    Creates a new feature that can be used in feature flag experiments.
+    The feature definition includes possible values and default value.
 
     Args:
         feature (FeatureDefinition): The feature configuration
@@ -37,20 +35,21 @@ async def create_feature(feature: FeatureDefinition, db: Session = Depends(get_d
         FeatureDefinition: The created feature definition
 
     Raises:
-        HTTPException: 400 if feature with same name already exists
+        ValidationError: If feature with same name already exists
     """
     db_feature = db.query(DBFeatureDefinition).filter(DBFeatureDefinition.name == feature.name).first()
     if db_feature:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Feature {feature.name} already exists"
+        raise ValidationError(
+            f"Feature {feature.name} already exists",
+            details={"feature_name": feature.name}
         )
     
     db_feature = DBFeatureDefinition(
         name=feature.name,
         description=feature.description,
         data_type=feature.data_type,
-        possible_values=feature.possible_values
+        possible_values=feature.possible_values,
+        default_value=feature.default_value
     )
     db.add(db_feature)
     db.commit()
@@ -73,27 +72,53 @@ async def list_features(db: Session = Depends(get_db)):
 @router.get("/{feature_name}", response_model=FeatureDefinition)
 async def get_feature(feature_name: str, db: Session = Depends(get_db)):
     """
-    Get a specific feature definition by name.
-
-    Retrieves detailed information about a single feature definition.
+    Get a feature definition by name.
 
     Args:
-        feature_name (str): The name of the feature to retrieve
+        feature_name (str): The name of the feature
         db: Database session
 
     Returns:
-        FeatureDefinition: The requested feature definition
+        FeatureDefinition: The feature definition
 
     Raises:
-        HTTPException: 404 if feature not found
+        ResourceNotFoundError: If feature not found
     """
-    db_feature = db.query(DBFeatureDefinition).filter(DBFeatureDefinition.name == feature_name).first()
-    if not db_feature:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Feature {feature_name} not found"
-        )
-    return db_feature
+    feature = db.query(DBFeatureDefinition).filter(DBFeatureDefinition.name == feature_name).first()
+    if not feature:
+        raise ResourceNotFoundError("Feature", feature_name)
+    return feature
+
+@router.put("/{feature_name}", response_model=FeatureDefinition)
+async def update_feature(
+    feature_name: str,
+    feature_update: FeatureDefinition,
+    db: Session = Depends(get_db)
+):
+    """
+    Update a feature definition.
+
+    Args:
+        feature_name (str): The name of the feature to update
+        feature_update (FeatureDefinition): The update data
+        db: Database session
+
+    Returns:
+        FeatureDefinition: The updated feature definition
+
+    Raises:
+        ResourceNotFoundError: If feature not found
+    """
+    feature = db.query(DBFeatureDefinition).filter(DBFeatureDefinition.name == feature_name).first()
+    if not feature:
+        raise ResourceNotFoundError("Feature", feature_name)
+    
+    for field, value in feature_update.dict(exclude_unset=True).items():
+        setattr(feature, field, value)
+    
+    db.commit()
+    db.refresh(feature)
+    return feature
 
 @router.delete("/{feature_name}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_feature(feature_name: str, db: Session = Depends(get_db)):
