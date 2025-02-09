@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from .db.session import get_db
 from .services.experiments import ExperimentService
-from .services.analysis import StatisticalAnalysisService
+from .services.analysis import StatisticalAnalysisService, BayesianAnalysisService, MultipleTestingCorrection, CombinedAnalysisService
 from .services.data import IcebergDataService
 from .services.scheduler import ExperimentScheduler
 from .config.app import settings
@@ -23,22 +23,42 @@ def get_iceberg_service() -> IcebergDataService:
     return IcebergDataService(catalog=catalog)
 
 @lru_cache
-def get_stats_service() -> StatisticalAnalysisService:
+def get_frequentist_service() -> StatisticalAnalysisService:
     """Get cached StatisticalAnalysisService instance."""
-    return StatisticalAnalysisService(
-        min_sample_size=100,
-        confidence_level=0.95
+    return StatisticalAnalysisService()
+
+@lru_cache
+def get_bayesian_service() -> BayesianAnalysisService:
+    """Get cached BayesianAnalysisService instance."""
+    return BayesianAnalysisService()
+
+@lru_cache
+def get_correction_service() -> MultipleTestingCorrection:
+    """Get cached MultipleTestingCorrection instance."""
+    return MultipleTestingCorrection()
+
+@lru_cache
+def get_analysis_service(
+    frequentist_service: StatisticalAnalysisService = Depends(get_frequentist_service),
+    bayesian_service: BayesianAnalysisService = Depends(get_bayesian_service),
+    correction_service: MultipleTestingCorrection = Depends(get_correction_service)
+) -> CombinedAnalysisService:
+    """Get cached CombinedAnalysisService instance."""
+    return CombinedAnalysisService(
+        frequentist_service=frequentist_service,
+        bayesian_service=bayesian_service,
+        correction_service=correction_service
     )
 
 def get_experiment_service(
     db: Session = Depends(get_db),
     iceberg_service: IcebergDataService = Depends(get_iceberg_service),
-    stats_service: StatisticalAnalysisService = Depends(get_stats_service)
+    analysis_service: CombinedAnalysisService = Depends(get_analysis_service)
 ) -> ExperimentService:
     """Get ExperimentService instance."""
     return ExperimentService(
         data_service=iceberg_service,
-        stats_service=stats_service
+        analysis_service=analysis_service
     )
 
 def get_scheduler(

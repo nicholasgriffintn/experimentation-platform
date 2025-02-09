@@ -1,10 +1,10 @@
-from typing import Dict
+from typing import Dict, Any, Optional
 from datetime import datetime
 import asyncio
 from sqlalchemy.orm import Session
 
 from ..db.base import Experiment
-from ..models.experiment import ExperimentStatus, GuardrailMetric
+from ..models.experiment import ExperimentStatus, GuardrailMetric, AnalysisMethod
 from .experiments import ExperimentService
 
 class ExperimentScheduler:
@@ -138,24 +138,55 @@ class ExperimentScheduler:
             if 'min_sample_size' in conditions:
                 sample_size = await self._get_experiment_sample_size(experiment)
                 if sample_size >= conditions['min_sample_size']:
-                    await self.stop_experiment(experiment, reason="Reached target sample size")
+                    await self.stop_experiment(
+                        experiment,
+                        reason="Reached target sample size"
+                    )
                     return
 
+            results = await self.experiment_service.analyze_results(experiment.id)
+            
+            if experiment.analysis_config.sequential_testing:
+                stopping_threshold = experiment.analysis_config.stopping_threshold
+                method = experiment.analysis_config.method
+                
+                for metric_results in results.get('metrics', {}).values():
+                    for result in metric_results.values():
+                        if method == AnalysisMethod.BAYESIAN:
+                            prob_improvement = 1 - result.get('p_value', 0)
+                            if (prob_improvement > (1 - stopping_threshold) or 
+                                prob_improvement < stopping_threshold):
+                                await self.stop_experiment(
+                                    experiment,
+                                    reason=f"Sequential stopping criterion met: probability of improvement = {prob_improvement:.3f}"
+                                )
+                                return
+                        else:
+                            p_value = result.get('p_value', 1)
+                            if p_value < stopping_threshold:
+                                await self.stop_experiment(
+                                    experiment,
+                                    reason=f"Sequential stopping criterion met: p-value = {p_value:.3f}"
+                                )
+                                return
+
             if 'significance_threshold' in conditions:
-                results = await self.experiment_service.analyze_results(experiment.id)
                 for metric_results in results.get('metrics', {}).values():
                     for result in metric_results.values():
                         if result.get('p_value', 1) <= conditions['significance_threshold']:
                             await self.stop_experiment(
-                                experiment, 
-                                reason=f"Reached statistical significance (p-value: {result['p_value']})"
+                                experiment,
+                                reason=f"Reached statistical significance (p-value: {result['p_value']:.3f})"
                             )
                             return
 
             if 'max_duration_hours' in conditions:
                 duration = datetime.utcnow() - experiment.started_at
                 if duration.total_seconds() / 3600 >= conditions['max_duration_hours']:
-                    await self.stop_experiment(experiment, reason="Reached maximum duration")
+                    await self.stop_experiment(
+                        experiment,
+                        reason="Reached maximum duration"
+                    )
                     return
 
         except Exception as e:
@@ -193,11 +224,16 @@ class ExperimentScheduler:
             print(f"Error getting sample size for experiment {experiment.id}: {str(e)}")
             return 0
 
-    async def stop_experiment(self, experiment: Experiment):
+    async def stop_experiment(
+        self,
+        experiment: Experiment,
+        reason: Optional[str] = None
+    ):
         """Stop an experiment and run final analysis"""
         try:
             experiment.status = ExperimentStatus.COMPLETED
             experiment.ended_at = datetime.utcnow()
+            experiment.stopped_reason = reason
             self.db.commit()
             
             if experiment.id in self.scheduled_tasks:
@@ -205,6 +241,14 @@ class ExperimentScheduler:
                 del self.scheduled_tasks[experiment.id]
             
             await self.experiment_service.analyze_results(experiment.id)
+            
+            await self.experiment_service.data_service.record_event(
+                experiment_id=experiment.id,
+                event_data={
+                    'event_type': 'stop',
+                    'reason': reason
+                }
+            )
             
         except Exception as e:
             self.db.rollback()

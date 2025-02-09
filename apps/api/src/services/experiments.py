@@ -4,7 +4,9 @@ from enum import Enum
 from pydantic import BaseModel
 
 from .data import IcebergDataService
-from .analysis import StatisticalAnalysisService
+from .analysis import CombinedAnalysisService
+from .bucketing import BucketingService
+from ..models.experiment import AnalysisMethod, CorrectionMethod
 
 class ExperimentType(str, Enum):
     AB = "ab"
@@ -46,11 +48,13 @@ class ExperimentService:
     def __init__(
         self,
         data_service: IcebergDataService,
-        stats_service: StatisticalAnalysisService,
+        analysis_service: CombinedAnalysisService,
+        bucketing_service: Optional[BucketingService] = None,
         cache_service: Optional[Any] = None
     ):
         self.data_service = data_service
-        self.stats_service = stats_service
+        self.analysis_service = analysis_service
+        self.bucketing_service = bucketing_service or BucketingService()
         self.cache_service = cache_service
 
     async def _get_experiment_config(self, experiment_id: str) -> Dict:
@@ -77,63 +81,44 @@ class ExperimentService:
         self,
         experiment_id: str,
         user_context: Dict,
-        targeting_type: TargetingType = TargetingType.USER_ID
-    ) -> VariantConfig:
+        targeting_type: str = "user_id"
+    ) -> Optional[Dict]:
         """Assign a variant to a user based on targeting rules"""
         config = await self._get_experiment_config(experiment_id)
         
         if not self._meets_targeting_rules(user_context, config.get('targeting_rules', {})):
             return None
 
-        assignment_key = self._get_assignment_key(user_context, targeting_type)
-        if not self._is_user_in_experiment(assignment_key, config.get('traffic_allocation', 100)):
+        assignment_key = user_context.get(targeting_type)
+        if not assignment_key:
             return None
 
-        variant = await self._get_consistent_assignment(
-            experiment_id,
-            assignment_key,
-            config['variants']
-        )
-
-        await self.data_service.assign_variant(
+        variant = self.bucketing_service.assign_variant(
+            user_id=assignment_key,
             experiment_id=experiment_id,
-            user_id=user_context.get('user_id'),
-            variant_id=variant.id,
-            context=user_context
+            variants=config['variants'],
+            experiment_type=config['type'],
+            traffic_allocation=config.get('traffic_allocation', 100.0)
         )
 
-        return variant
+        if variant:
+            await self.data_service.assign_variant(
+                experiment_id=experiment_id,
+                user_id=user_context.get('user_id'),
+                variant_id=variant.id,
+                context=user_context
+            )
 
-    def _is_user_in_experiment(self, assignment_key: str, traffic_allocation: float) -> bool:
-        """Determine if a user should be included in the experiment based on traffic allocation"""
-        import hashlib
-        
-        hash_input = f"traffic_allocation:{assignment_key}".encode()
-        hash_value = int(hashlib.sha256(hash_input).hexdigest(), 16)
-        normalized_hash = hash_value / 2**256
-        
-        return normalized_hash < (traffic_allocation / 100)
+        return variant.dict() if variant else None
 
-    async def _get_consistent_assignment(
-        self,
-        experiment_id: str,
-        assignment_key: str,
-        variants: List[VariantConfig]
-    ) -> VariantConfig:
-        """Get consistent variant assignment based on hash"""
-        import hashlib
-        
-        hash_input = f"{experiment_id}:{assignment_key}".encode()
-        hash_value = int(hashlib.sha256(hash_input).hexdigest(), 16)
-        normalized_hash = hash_value / 2**256
-        
-        cumulative_split = 0
-        for variant in variants:
-            cumulative_split += variant.traffic_percentage / 100
-            if normalized_hash < cumulative_split:
-                return variant
-                
-        return variants[-1]
+    def _meets_targeting_rules(self, user_context: Dict, targeting_rules: Dict) -> bool:
+        """Check if user meets targeting rules"""
+        for rule_key, rule_value in targeting_rules.items():
+            if rule_key not in user_context:
+                return False
+            if user_context[rule_key] != rule_value:
+                return False
+        return True
 
     async def record_exposure(
         self,
@@ -180,12 +165,14 @@ class ExperimentService:
         experiment_id: str,
         metrics: Optional[List[str]] = None
     ) -> Dict:
-        """Analyze current experiment results"""
+        """Analyze current experiment results with multiple testing correction"""
         config = await self._get_experiment_config(experiment_id)
         metrics_to_analyze = metrics or [m.name for m in config['metrics']]
         
         metrics_results = {}
         total_users = 0
+        all_p_values = []
+        variant_p_values = {}
         
         for metric_name in metrics_to_analyze:
             metric_data = await self._get_metric_data(experiment_id, metric_name)
@@ -199,14 +186,42 @@ class ExperimentService:
                     continue
                     
                 total_users = max(total_users, len(variant_data))
-                analysis_result = await self.stats_service.analyze_experiment(
+                
+                analysis_config = config.get('analysis_config', {})
+                method = analysis_config.get('method', AnalysisMethod.FREQUENTIST)
+                sequential = analysis_config.get('sequential_testing', False)
+                stopping_threshold = analysis_config.get('stopping_threshold', 0.01)
+                
+                analysis_result = await self.analysis_service.analyze_experiment(
                     control_data=control_data,
                     variant_data=variant_data,
                     metric_type=config['metrics'][metric_name].type,
-                    metric_name=metric_name
+                    metric_name=metric_name,
+                    method=method,
+                    sequential=sequential,
+                    stopping_threshold=stopping_threshold
                 )
                 
+                all_p_values.append(analysis_result.p_value)
+                variant_p_values[(metric_name, variant_id)] = len(all_p_values) - 1
                 metrics_results[metric_name][variant_id] = analysis_result
+
+        if len(all_p_values) > 1:
+            correction_method = config.get('analysis_config', {}).get(
+                'correction_method', 
+                CorrectionMethod.FDR_BH
+            )
+            corrected_p_values = self.analysis_service.apply_correction(
+                all_p_values,
+                method=correction_method
+            )
+            
+            for (metric_name, variant_id), p_value_idx in variant_p_values.items():
+                corrected_p_value = corrected_p_values[p_value_idx]
+                metrics_results[metric_name][variant_id].p_value = corrected_p_value
+                metrics_results[metric_name][variant_id].is_significant = (
+                    corrected_p_value < config.get('analysis_config', {}).get('alpha', 0.05)
+                )
 
         results = {
             "experiment_id": experiment_id,
@@ -215,7 +230,7 @@ class ExperimentService:
             "end_time": config.get('end_time'),
             "total_users": total_users,
             "metrics": metrics_results,
-            "guardrail_violations": None  # TODO: Implement guardrail checks
+            "correction_method": correction_method if len(all_p_values) > 1 else None
         }
 
         await self.data_service.record_results(
@@ -224,15 +239,6 @@ class ExperimentService:
         )
 
         return results
-
-    def _meets_targeting_rules(self, user_context: Dict, targeting_rules: Dict) -> bool:
-        """Check if user meets targeting rules"""
-        for rule_key, rule_value in targeting_rules.items():
-            if rule_key not in user_context:
-                return False
-            if user_context[rule_key] != rule_value:
-                return False
-        return True
 
     async def _get_metric_data(
         self,

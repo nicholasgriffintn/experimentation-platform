@@ -20,7 +20,8 @@ from ..db.base import (
     Experiment as DBExperiment,
     MetricDefinition as DBMetricDefinition,
     ExperimentMetric as DBExperimentMetric,
-    Variant as DBVariant
+    Variant as DBVariant,
+    GuardrailMetric as DBGuardrailMetric
 )
 from ..dependencies import get_experiment_service
 
@@ -317,6 +318,23 @@ def create_experiment_in_db(experiment: ExperimentCreate, db: Session) -> DBExpe
     if experiment.schedule:
         experiment_data['start_time'] = experiment.schedule.start_time
         experiment_data['end_time'] = experiment.schedule.end_time
+        experiment_data['ramp_up_period'] = experiment.schedule.ramp_up_period
+        experiment_data['auto_stop_conditions'] = (
+            experiment.schedule.auto_stop_conditions.dict() 
+            if experiment.schedule.auto_stop_conditions 
+            else None
+        )
+    
+    if experiment.analysis_config:
+        experiment_data['analysis_method'] = experiment.analysis_config.method
+        experiment_data['confidence_level'] = experiment.analysis_config.confidence_level
+        experiment_data['correction_method'] = experiment.analysis_config.correction_method
+        experiment_data['sequential_testing'] = experiment.analysis_config.sequential_testing
+        experiment_data['stopping_threshold'] = experiment.analysis_config.stopping_threshold
+        experiment_data['min_sample_size'] = experiment.analysis_config.min_sample_size
+        experiment_data['prior_successes'] = experiment.analysis_config.prior_successes
+        experiment_data['prior_trials'] = experiment.analysis_config.prior_trials
+        experiment_data['num_samples'] = experiment.analysis_config.num_samples
     
     db_experiment = DBExperiment(**experiment_data)
     db.add(db_experiment)
@@ -338,6 +356,16 @@ def create_experiment_in_db(experiment: ExperimentCreate, db: Session) -> DBExpe
             metric_name=metric_name
         )
         db.add(experiment_metric)
+    
+    if experiment.guardrail_metrics:
+        for guardrail in experiment.guardrail_metrics:
+            guardrail_metric = DBGuardrailMetric(
+                experiment_id=db_experiment.id,
+                metric_name=guardrail.metric_name,
+                threshold=guardrail.threshold,
+                operator=guardrail.operator
+            )
+            db.add(guardrail_metric)
     
     db.commit()
     db.refresh(db_experiment)

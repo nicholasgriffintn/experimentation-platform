@@ -32,6 +32,35 @@ export interface ExperimentSchedule {
     auto_stop_conditions?: Record<string, any>;
 }
 
+export type GuardrailOperator = 'gt' | 'lt' | 'gte' | 'lte';
+
+export interface GuardrailConfig {
+    metric_name: string;
+    threshold: number;
+    operator: GuardrailOperator;
+}
+
+export type AnalysisMethod = 'frequentist' | 'bayesian';
+export type CorrectionMethod = 'none' | 'fdr_bh' | 'holm';
+
+export interface MetricAnalysisConfig {
+    min_sample_size: number;
+    min_effect_size: number;
+}
+
+export interface AnalysisConfig {
+    method: AnalysisMethod;
+    confidence_level: number;
+    correction_method: CorrectionMethod;
+    sequential_testing: boolean;
+    stopping_threshold?: number;
+    default_metric_config: MetricAnalysisConfig;
+    metric_configs?: Record<string, MetricAnalysisConfig>;
+    prior_successes?: number;
+    prior_trials?: number;
+    num_samples?: number;
+}
+
 export interface ExperimentCreate {
     name: string;
     description: string;
@@ -43,6 +72,7 @@ export interface ExperimentCreate {
     schedule?: ExperimentSchedule;
     parameters?: Record<string, any>;
     guardrail_metrics?: GuardrailConfig[];
+    analysis_config?: AnalysisConfig;
 }
 
 export interface Experiment extends ExperimentCreate {
@@ -75,12 +105,4 @@ export interface ExperimentResults {
     experiment_id: string;
     metrics: MetricResult[];
     last_updated: string;
-}
-
-export type GuardrailOperator = 'gt' | 'lt' | 'gte' | 'lte';
-
-export interface GuardrailConfig {
-    metric_name: string;
-    threshold: number;
-    operator: GuardrailOperator;
 } 

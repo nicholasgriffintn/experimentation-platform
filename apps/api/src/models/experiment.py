@@ -113,11 +113,66 @@ class ExperimentBase(BaseModel):
     )
 
 
+class AnalysisMethod(str, Enum):
+    FREQUENTIST = "frequentist"
+    BAYESIAN = "bayesian"
+
+
+class CorrectionMethod(str, Enum):
+    NONE = "none"
+    FDR_BH = "fdr_bh"
+    HOLM = "holm"
+
+
+class MetricAnalysisConfig(BaseModel):
+    min_sample_size: int = Field(default=100, gt=0)
+    min_effect_size: float = Field(default=0.01, gt=0)
+
+
+class AnalysisConfig(BaseModel):
+    method: AnalysisMethod = Field(default=AnalysisMethod.FREQUENTIST)
+    confidence_level: float = Field(default=0.95, ge=0, le=1)
+    correction_method: CorrectionMethod = Field(default=CorrectionMethod.NONE)
+    sequential_testing: bool = Field(default=False)
+    stopping_threshold: Optional[float] = Field(default=0.01, ge=0, le=1)
+    
+    default_metric_config: MetricAnalysisConfig = Field(
+        default_factory=MetricAnalysisConfig,
+        description="Default configuration for all metrics"
+    )
+    
+    metric_configs: Dict[str, MetricAnalysisConfig] = Field(
+        default_factory=dict,
+        description="Metric-specific configurations that override defaults"
+    )
+    
+    prior_successes: Optional[int] = Field(default=30, ge=0)
+    prior_trials: Optional[int] = Field(default=100, ge=0)
+    num_samples: Optional[int] = Field(default=10000, ge=1000)
+
+    @model_validator(mode='after')
+    def validate_bayesian_params(self):
+        if self.method == AnalysisMethod.BAYESIAN:
+            if self.prior_successes is None or self.prior_trials is None:
+                raise ValueError("Bayesian analysis requires prior_successes and prior_trials")
+            if self.prior_successes > self.prior_trials:
+                raise ValueError("prior_successes cannot be greater than prior_trials")
+        return self
+
+    def get_metric_config(self, metric_name: str) -> MetricAnalysisConfig:
+        """Get the configuration for a specific metric, falling back to defaults if not specified"""
+        return self.metric_configs.get(metric_name, self.default_metric_config)
+
+
 class ExperimentCreate(ExperimentBase):
     variants: List[VariantConfig] = Field(..., description="Variant configurations")
     metrics: List[str] = Field(..., description="Metrics being measured")
     guardrail_metrics: Optional[List[GuardrailConfig]] = None
     schedule: Optional[ExperimentSchedule] = None
+    analysis_config: Optional[AnalysisConfig] = Field(
+        default_factory=lambda: AnalysisConfig(),
+        description="Configuration for statistical analysis"
+    )
 
 
 class Experiment(ExperimentBase):
@@ -132,6 +187,10 @@ class Experiment(ExperimentBase):
     variants: List[VariantConfig] = Field(default_factory=list, description="List of variants for this experiment")
     metrics: List[str] = Field(default_factory=list, description="List of metric names for this experiment")
     schedule: Optional[ExperimentSchedule] = Field(None, description="Experiment schedule configuration")
+    analysis_config: AnalysisConfig = Field(
+        default_factory=lambda: AnalysisConfig(),
+        description="Configuration for statistical analysis"
+    )
     
     @model_validator(mode='before')
     @classmethod
@@ -209,9 +268,11 @@ class ExperimentResults(BaseModel):
     metrics: Dict[str, Dict[str, MetricResult]]  # metric_name -> variant_id -> result
     guardrail_violations: Optional[List[Dict[str, Any]]] = None
 
+
 class ExperimentMetricBase(BaseModel):
     experiment_id: str
     metric_name: str
+
 
 class ExperimentMetricCreate(ExperimentMetricBase):
     min_sample_size: Optional[int] = None
@@ -220,17 +281,21 @@ class ExperimentMetricCreate(ExperimentMetricBase):
     guardrail_threshold: Optional[float] = None
     guardrail_operator: Optional[str] = None  # 'gt', 'lt', 'gte', 'lte'
 
+
 class ExperimentMetric(ExperimentMetricBase):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     
     class Config:
         from_attributes = True
+
+
 class GuardrailOperator(str, Enum):
     GREATER_THAN = "gt"
     LESS_THAN = "lt"
     GREATER_THAN_OR_EQUAL = "gte"
     LESS_THAN_OR_EQUAL = "lte"
+
 
 class GuardrailMetricBase(BaseModel):
     experiment_id: str

@@ -1,14 +1,9 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 import numpy as np
 from scipy import stats
 from dataclasses import dataclass
-from enum import Enum
 
-class MetricType(str, Enum):
-    CONTINUOUS = "continuous"
-    BINARY = "binary"
-    COUNT = "count"
-    RATIO = "ratio"
+from ...models.experiment import MetricType
 
 @dataclass
 class ExperimentResult:
@@ -23,7 +18,6 @@ class ExperimentResult:
     is_significant: bool
 
 class StatisticalAnalysisService:
-    # TODO: This is a simple implementation for now, I'll work on this over time.
     def __init__(self, min_sample_size: int = 100, confidence_level: float = 0.95):
         if not 0 < confidence_level < 1:
             raise ValueError("Confidence level must be between 0 and 1")
@@ -223,3 +217,42 @@ class StatisticalAnalysisService:
         )
         
         return int(np.ceil(sample_size))
+
+    def _check_sequential_stopping(
+        self,
+        control_data: List[float],
+        variant_data: List[float],
+        metric_type: MetricType,
+        stopping_threshold: float
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """Check if sequential testing should stop early"""
+        if len(control_data) < self.min_sample_size or len(variant_data) < self.min_sample_size:
+            return False, {}
+
+        if metric_type == MetricType.BINARY:
+            control_mean = np.mean(control_data)
+            variant_mean = np.mean(variant_data)
+            pooled_p = (sum(control_data) + sum(variant_data)) / (len(control_data) + len(variant_data))
+            se = np.sqrt(pooled_p * (1 - pooled_p) * (1/len(control_data) + 1/len(variant_data)))
+        else:
+            control_mean = np.mean(control_data)
+            variant_mean = np.mean(variant_data)
+            pooled_std = np.sqrt(
+                ((len(control_data) - 1) * np.var(control_data, ddof=1) + 
+                 (len(variant_data) - 1) * np.var(variant_data, ddof=1)) / 
+                (len(control_data) + len(variant_data) - 2)
+            )
+            se = pooled_std * np.sqrt(1/len(control_data) + 1/len(variant_data))
+
+        z_score = (variant_mean - control_mean) / se
+        p_value = 2 * (1 - stats.norm.cdf(abs(z_score)))
+
+        should_stop = p_value < stopping_threshold or p_value > (1 - stopping_threshold)
+        
+        return should_stop, {
+            "z_score": z_score,
+            "p_value": p_value,
+            "control_mean": control_mean,
+            "variant_mean": variant_mean,
+            "standard_error": se
+        } 

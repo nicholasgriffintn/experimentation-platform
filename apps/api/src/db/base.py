@@ -1,9 +1,14 @@
 from datetime import datetime
 from typing import List
-from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, JSON, ForeignKey, Float, Integer
+from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, JSON, ForeignKey, Float, Integer, Boolean
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from ..models.experiment import ExperimentStatus, ExperimentType
+from ..models.experiment import (
+    ExperimentStatus,
+    ExperimentType,
+    AnalysisMethod,
+    CorrectionMethod
+)
 
 
 class Base(DeclarativeBase):
@@ -31,6 +36,22 @@ class Experiment(Base):
     started_at = Column(DateTime)
     ended_at = Column(DateTime)
     stopped_reason = Column(String, nullable=True)
+    
+    analysis_method = Column(SQLEnum(AnalysisMethod), nullable=False, default=AnalysisMethod.FREQUENTIST)
+    confidence_level = Column(Float, nullable=False, default=0.95)
+    correction_method = Column(SQLEnum(CorrectionMethod), nullable=False, default=CorrectionMethod.NONE)
+    sequential_testing = Column(Boolean, nullable=False, default=False)
+    stopping_threshold = Column(Float, nullable=True, default=0.01)
+    
+    metric_configs = Column(JSON, default={})
+    default_metric_config = Column(JSON, nullable=False, default={
+        "min_sample_size": 100,
+        "min_effect_size": 0.01
+    })
+    
+    prior_successes = Column(Integer, nullable=True, default=30)
+    prior_trials = Column(Integer, nullable=True, default=100)
+    num_samples = Column(Integer, nullable=True, default=10000)
     
     variants = relationship("Variant", back_populates="experiment")
     metrics = relationship("ExperimentMetric", back_populates="experiment")
@@ -70,8 +91,6 @@ class MetricDefinition(Base):
     data_type = Column(String, nullable=False)  # continuous, binary, count
     aggregation_method = Column(String, nullable=False)
     query_template = Column(String)
-    min_sample_size = Column(Integer)
-    min_effect_size = Column(Float)
 
 class ExperimentMetric(Base):
     __tablename__ = "experiment_metrics"

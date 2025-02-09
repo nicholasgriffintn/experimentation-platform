@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { metrics as metricsStore, metricActions } from '$lib/stores/metrics';
-    import type { ExperimentType, VariantType, Variant, ExperimentCreate, ExperimentSchedule, GuardrailConfig, GuardrailOperator } from '$lib/types/api';
+    import type { ExperimentType, VariantType, Variant, ExperimentCreate, ExperimentSchedule, GuardrailConfig, GuardrailOperator, AnalysisConfig } from '$lib/types/api';
     import { createEventDispatcher } from 'svelte';
     import { formatDateToISO } from '$lib/utils/date';
 
@@ -24,6 +24,23 @@
     let targeting_rules: Record<string, any> = experiment.targeting_rules ?? {};
     let schedule: Partial<ExperimentSchedule> = experiment.schedule ?? {};
     let parameters: Record<string, any> = experiment.parameters ?? {};
+    let analysis_config: AnalysisConfig = {
+        method: 'frequentist',
+        confidence_level: 0.95,
+        correction_method: 'none',
+        sequential_testing: false,
+        stopping_threshold: 0.01,
+        default_metric_config: {
+            min_sample_size: 100,
+            min_effect_size: 0.01
+        },
+        metric_configs: {},
+        ...experiment.analysis_config
+    };
+
+    function getBayesianValue(value: number | undefined, defaultValue: number): number {
+        return value ?? defaultValue;
+    }
 
     const experimentTypes = ['ab_test', 'multivariate', 'feature_flag'];
     const guardrailOperators: GuardrailOperator[] = ['gt', 'lt', 'gte', 'lte'];
@@ -178,10 +195,29 @@
             targeting_rules,
             schedule: finalSchedule,
             parameters,
-            guardrail_metrics: guardrail_metrics.length > 0 ? guardrail_metrics : undefined
+            guardrail_metrics: guardrail_metrics.length > 0 ? guardrail_metrics : undefined,
+            analysis_config
         };
         dispatch('submit', experimentData);
     }
+
+    // Initialize Bayesian fields when method changes
+    $: if (analysis_config.method === 'bayesian') {
+        analysis_config = {
+            ...analysis_config,
+            prior_successes: 30,
+            prior_trials: 100,
+            num_samples: 10000
+        };
+    }
+
+    $: bayesianRate = analysis_config.method === 'bayesian' ? 
+        (getBayesianValue(analysis_config.prior_successes, 30) / 
+         getBayesianValue(analysis_config.prior_trials, 100) * 100).toFixed(1) : '0.0';
+
+    $: showBayesianError = analysis_config.method === 'bayesian' && 
+        getBayesianValue(analysis_config.prior_successes, 0) > 
+        getBayesianValue(analysis_config.prior_trials, 100);
 </script>
 
 <form on:submit|preventDefault={handleSubmit} class="space-y-6">
@@ -451,6 +487,176 @@
                 />
             </div>
         </div>
+    </div>
+
+    <div class="space-y-4">
+        <h3 class="text-lg font-semibold">Analysis Configuration</h3>
+        <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+                <label for="analysis_method" class="block text-sm font-medium">Analysis Method</label>
+                <select
+                    id="analysis_method"
+                    bind:value={analysis_config.method}
+                    disabled={loading}
+                    class="w-full px-3 py-2 border rounded-md"
+                >
+                    <option value="frequentist">Frequentist</option>
+                    <option value="bayesian">Bayesian</option>
+                </select>
+            </div>
+
+            <div class="space-y-2">
+                <label for="confidence_level" class="block text-sm font-medium">Confidence Level</label>
+                <input
+                    type="number"
+                    id="confidence_level"
+                    bind:value={analysis_config.confidence_level}
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    disabled={loading}
+                    class="w-full px-3 py-2 border rounded-md"
+                />
+            </div>
+
+            <div class="space-y-2">
+                <label for="correction_method" class="block text-sm font-medium">Correction Method</label>
+                <select
+                    id="correction_method"
+                    bind:value={analysis_config.correction_method}
+                    disabled={loading}
+                    class="w-full px-3 py-2 border rounded-md"
+                >
+                    <option value="none">None</option>
+                    <option value="fdr_bh">Benjamini-Hochberg FDR</option>
+                    <option value="holm">Holm-Bonferroni</option>
+                </select>
+            </div>
+
+            <div class="space-y-2">
+                <label class="flex items-center space-x-2">
+                    <input
+                        type="checkbox"
+                        bind:checked={analysis_config.sequential_testing}
+                        disabled={loading}
+                        class="rounded"
+                    />
+                    <span class="text-sm font-medium">Enable Sequential Testing</span>
+                </label>
+                {#if analysis_config.sequential_testing}
+                    <input
+                        type="number"
+                        bind:value={analysis_config.stopping_threshold}
+                        min="0"
+                        max="1"
+                        step="0.001"
+                        placeholder="Stopping Threshold"
+                        disabled={loading}
+                        class="w-full px-3 py-2 border rounded-md mt-2"
+                    />
+                {/if}
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <h4 class="font-medium">Default Metric Configuration</h4>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label for="min_sample_size" class="block text-sm font-medium">Minimum Sample Size</label>
+                    <input
+                        type="number"
+                        id="min_sample_size"
+                        bind:value={analysis_config.default_metric_config.min_sample_size}
+                        min="1"
+                        step="1"
+                        disabled={loading}
+                        class="w-full px-3 py-2 border rounded-md"
+                    />
+                </div>
+
+                <div class="space-y-2">
+                    <label for="min_effect_size" class="block text-sm font-medium">Minimum Effect Size</label>
+                    <input
+                        type="number"
+                        id="min_effect_size"
+                        bind:value={analysis_config.default_metric_config.min_effect_size}
+                        min="0"
+                        step="0.01"
+                        disabled={loading}
+                        class="w-full px-3 py-2 border rounded-md"
+                    />
+                </div>
+            </div>
+        </div>
+
+        {#if analysis_config.method === 'bayesian'}
+            <div class="space-y-4">
+                <h4 class="font-medium">Bayesian Configuration</h4>
+                <p class="text-sm text-gray-600 mb-4">
+                    Prior configuration represents your initial beliefs about the metrics before running the experiment.
+                    For example, if you believe the baseline conversion rate is around 30%, you might set 30 successes out of 100 trials.
+                    Higher numbers indicate stronger prior beliefs.
+                </p>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="space-y-2">
+                        <label for="prior_successes" class="block text-sm font-medium">Prior Successes</label>
+                        <input
+                            type="number"
+                            id="prior_successes"
+                            bind:value={analysis_config.prior_successes}
+                            min="0"
+                            max={getBayesianValue(analysis_config.prior_trials, 100)}
+                            step="1"
+                            disabled={loading}
+                            class="w-full px-3 py-2 border rounded-md"
+                        />
+                        <p class="text-xs text-gray-500">Number of expected successes in prior data (e.g., conversions)</p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label for="prior_trials" class="block text-sm font-medium">Prior Trials</label>
+                        <input
+                            type="number"
+                            id="prior_trials"
+                            bind:value={analysis_config.prior_trials}
+                            min={getBayesianValue(analysis_config.prior_successes, 0)}
+                            step="1"
+                            disabled={loading}
+                            class="w-full px-3 py-2 border rounded-md"
+                        />
+                        <p class="text-xs text-gray-500">Total number of prior observations (must be ≥ prior successes)</p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label for="num_samples" class="block text-sm font-medium">MCMC Samples</label>
+                        <input
+                            type="number"
+                            id="num_samples"
+                            bind:value={analysis_config.num_samples}
+                            min="1000"
+                            step="1000"
+                            disabled={loading}
+                            class="w-full px-3 py-2 border rounded-md"
+                        />
+                        <p class="text-xs text-gray-500">Number of Monte Carlo samples (higher = more precise but slower)</p>
+                    </div>
+                </div>
+
+                {#if showBayesianError}
+                    <p class="text-sm text-red-600 mt-2">
+                        Prior successes cannot be greater than prior trials
+                    </p>
+                {/if}
+
+                <div class="mt-4 p-4 bg-blue-50 rounded-md">
+                    <p class="text-sm text-blue-800">
+                        With these settings, your prior belief is that the baseline rate is around 
+                        {bayesianRate}%
+                        with {getBayesianValue(analysis_config.prior_trials, 100)} observations worth of confidence.
+                    </p>
+                </div>
+            </div>
+        {/if}
     </div>
 
     <div class="flex justify-end space-x-3">

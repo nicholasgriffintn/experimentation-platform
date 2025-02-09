@@ -1,8 +1,8 @@
-"""Initial migration
+"""first
 
-Revision ID: 1c54e6721bac
+Revision ID: 42d5e51c5bd8
 Revises: 
-Create Date: 2025-02-08 22:36:10.325031
+Create Date: 2025-02-09 03:02:09.973069
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '1c54e6721bac'
+revision: str = '42d5e51c5bd8'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -31,10 +31,24 @@ def upgrade() -> None:
     sa.Column('status', sa.Enum('DRAFT', 'SCHEDULED', 'RUNNING', 'PAUSED', 'COMPLETED', 'STOPPED', name='experimentstatus'), nullable=False),
     sa.Column('start_time', sa.DateTime(), nullable=True),
     sa.Column('end_time', sa.DateTime(), nullable=True),
+    sa.Column('ramp_up_period', sa.Integer(), nullable=True),
+    sa.Column('auto_stop_conditions', sa.JSON(), nullable=True),
+    sa.Column('traffic_allocation', sa.Float(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.Column('started_at', sa.DateTime(), nullable=True),
     sa.Column('ended_at', sa.DateTime(), nullable=True),
+    sa.Column('stopped_reason', sa.String(), nullable=True),
+    sa.Column('analysis_method', sa.Enum('FREQUENTIST', 'BAYESIAN', name='analysismethod'), nullable=False),
+    sa.Column('confidence_level', sa.Float(), nullable=False),
+    sa.Column('correction_method', sa.Enum('NONE', 'FDR_BH', 'HOLM', name='correctionmethod'), nullable=False),
+    sa.Column('sequential_testing', sa.Boolean(), nullable=False),
+    sa.Column('stopping_threshold', sa.Float(), nullable=True),
+    sa.Column('metric_configs', sa.JSON(), nullable=True),
+    sa.Column('default_metric_config', sa.JSON(), nullable=False),
+    sa.Column('prior_successes', sa.Integer(), nullable=True),
+    sa.Column('prior_trials', sa.Integer(), nullable=True),
+    sa.Column('num_samples', sa.Integer(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('feature_definitions',
@@ -51,8 +65,6 @@ def upgrade() -> None:
     sa.Column('data_type', sa.String(), nullable=False),
     sa.Column('aggregation_method', sa.String(), nullable=False),
     sa.Column('query_template', sa.String(), nullable=True),
-    sa.Column('min_sample_size', sa.Integer(), nullable=True),
-    sa.Column('min_effect_size', sa.Float(), nullable=True),
     sa.PrimaryKeyConstraint('name')
     )
     op.create_table('experiment_metrics',
