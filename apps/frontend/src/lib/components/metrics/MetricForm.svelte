@@ -17,6 +17,8 @@
     let data_type = metric.data_type ?? 'count';
     let aggregation_method = metric.aggregation_method ?? 'sum';
     let query_template = metric.query_template ?? '';
+    let min_sample_size = metric.min_sample_size ?? null;
+    let min_effect_size = metric.min_effect_size ?? null;
 
     const aggregationMethods = ['sum', 'avg', 'count', 'min', 'max'];
     const dataTypes = ['continuous', 'binary', 'count', 'ratio'];
@@ -28,7 +30,9 @@
             unit,
             data_type,
             aggregation_method,
-            query_template
+            query_template,
+            ...(min_sample_size !== null && { min_sample_size: Number(min_sample_size) }),
+            ...(min_effect_size !== null && { min_effect_size: Number(min_effect_size) })
         };
         dispatch('submit', metricData);
     }
@@ -121,6 +125,42 @@
             rows="5"
             placeholder="SELECT COUNT(*) as value FROM events WHERE experiment_id = 1 AND variant_id = 1"
         ></textarea>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-2">
+            <label for="min_sample_size" class="block text-sm font-medium">
+                Minimum Sample Size
+            </label>
+            <input
+                type="number"
+                id="min_sample_size"
+                bind:value={min_sample_size}
+                min="0"
+                step="1"
+                disabled={loading}
+                class="w-full px-3 py-2 border rounded-md"
+                placeholder="e.g., 1000"
+            />
+            <p class="text-xs text-gray-500">Minimum number of samples needed for statistical validity</p>
+        </div>
+
+        <div class="space-y-2">
+            <label for="min_effect_size" class="block text-sm font-medium">
+                Minimum Effect Size
+            </label>
+            <input
+                type="number"
+                id="min_effect_size"
+                bind:value={min_effect_size}
+                min="0"
+                step="0.01"
+                disabled={loading}
+                class="w-full px-3 py-2 border rounded-md"
+                placeholder="e.g., 0.05"
+            />
+            <p class="text-xs text-gray-500">Smallest meaningful difference to detect (e.g., 0.05 for 5%)</p>
+        </div>
     </div>
 
     <div class="flex justify-end space-x-3">

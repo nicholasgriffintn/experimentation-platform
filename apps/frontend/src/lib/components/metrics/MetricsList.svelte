@@ -106,6 +106,16 @@
                                 <span class="inline-block px-2 py-1 text-sm bg-gray-100 rounded">
                                     Aggregation: {metric.aggregation_method}
                                 </span>
+                                {#if metric.min_sample_size}
+                                    <span class="inline-block px-2 py-1 text-sm bg-gray-100 rounded">
+                                        Min Sample: {metric.min_sample_size.toLocaleString()}
+                                    </span>
+                                {/if}
+                                {#if metric.min_effect_size}
+                                    <span class="inline-block px-2 py-1 text-sm bg-gray-100 rounded">
+                                        Min Effect: {(metric.min_effect_size * 100).toFixed(1)}%
+                                    </span>
+                                {/if}
                             </div>
                         </div>
                         <div class="space-x-2">

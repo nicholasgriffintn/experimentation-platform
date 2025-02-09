@@ -10,6 +10,8 @@ export interface MetricDefinition {
     data_type: 'continuous' | 'binary' | 'count' | 'ratio';
     aggregation_method: string;
     query_template: string;
+    min_sample_size?: number;
+    min_effect_size?: number;
 }
 
 export interface Variant {
