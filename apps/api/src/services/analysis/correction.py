@@ -1,5 +1,7 @@
 from typing import List
+
 import numpy as np
+
 
 class MultipleTestingCorrection:
     """Handles multiple testing corrections for experiment results"""

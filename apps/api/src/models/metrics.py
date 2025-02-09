@@ -1,8 +1,9 @@
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel, Field
 
-from .user import UserContext
 from .enums import MetricType
+from .user import UserContext
 
 
 class MetricEvent(BaseModel):

@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pyiceberg.catalog.hive import HiveCatalog
 
+
 class IcebergConfig(BaseSettings):
     warehouse_location: str = "s3://your-bucket/warehouse"
     catalog_name: str = "experiment_catalog"

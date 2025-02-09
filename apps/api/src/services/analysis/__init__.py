@@ -1,7 +1,7 @@
-from .frequentist import StatisticalAnalysisService, ExperimentResult
 from .bayesian import BayesianAnalysisService
+from .combined import CombinedAnalysisResult, CombinedAnalysisService
 from .correction import MultipleTestingCorrection
-from .combined import CombinedAnalysisService, CombinedAnalysisResult
+from .frequentist import ExperimentResult, StatisticalAnalysisService
 
 __all__ = [
     'StatisticalAnalysisService',

@@ -1,15 +1,15 @@
 from datetime import datetime
 from typing import List
-from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, JSON, ForeignKey, Float, Integer, Boolean
+
+from sqlalchemy import JSON, Boolean, Column, DateTime
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Float, ForeignKey, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from ..models.analysis import AnalysisMethod, CorrectionMethod
 from ..models.experiments import (
     ExperimentStatus,
     ExperimentType,
-)
-from ..models.analysis import (
-    AnalysisMethod,
-    CorrectionMethod
 )
 
 

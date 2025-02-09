@@ -1,17 +1,18 @@
+import asyncio
+import logging.config
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio
 
 from .config.app import settings
-from .routers import experiments, metrics, features
-from .dependencies import get_db, get_experiment_service
 from .db.base import Base
-from .db.session import engine
-from .services.scheduler import ExperimentScheduler
 from .db.seed import seed_all
-from .utils.logger import LogConfig, logger
-import logging.config
+from .db.session import engine
+from .dependencies import get_db, get_experiment_service
 from .middleware.error_handler import error_handler
+from .routers import experiments, features, metrics
+from .services.scheduler import ExperimentScheduler
+from .utils.logger import LogConfig, logger
 
 logging.config.dictConfig(LogConfig().dict())
 

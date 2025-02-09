@@ -1,11 +1,12 @@
 from pyiceberg.schema import Schema
 from pyiceberg.types import (
+    DoubleType,
+    LongType,
+    MapType,
     StringType,
     TimestampType,
-    DoubleType,
-    MapType,
-    LongType,
 )
+
 
 class IcebergSchemas:
     @staticmethod

@@ -1,9 +1,11 @@
-from typing import Dict, List, Tuple, Any
+from dataclasses import dataclass
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
 from scipy import stats
-from dataclasses import dataclass
 
 from ...models.metrics import MetricType
+
 
 @dataclass
 class ExperimentResult:

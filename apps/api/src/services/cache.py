@@ -1,7 +1,9 @@
-from typing import Any, Optional, Union
 import json
+from typing import Any, Optional, Union
+
 import redis.asyncio as redis
 from pydantic import BaseModel
+
 
 class RedisCache:
     """Redis cache wrapper"""

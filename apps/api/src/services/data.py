@@ -1,13 +1,15 @@
-from typing import Dict, List, Optional, Any
-from datetime import datetime
 import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from pyiceberg.catalog import Catalog
-from pyiceberg.table import Table
-from pyiceberg.schema import Schema
 from pyiceberg.partitioning import PartitionSpec
+from pyiceberg.schema import Schema
+from pyiceberg.table import Table
 
 from ..schema.iceberg import IcebergSchemas
 from ..utils.logger import logger
+
 
 class IcebergDataService:
     def __init__(self, catalog: Catalog):

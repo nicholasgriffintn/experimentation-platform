@@ -1,7 +1,9 @@
-from typing import Dict, List, Tuple, Any
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
 
 from ...models.metrics import MetricType
+
 
 class BayesianAnalysisService:
     def __init__(self, prior_successes: int = 30, prior_trials: int = 100, num_samples: int = 10000):

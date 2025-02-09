@@ -1,12 +1,14 @@
-from typing import Dict, List, Optional, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel
 
-from .data import IcebergDataService
+from ..models.analysis import AnalysisMethod, CorrectionMethod
 from .analysis import CombinedAnalysisService
 from .bucketing import BucketingService
-from ..models.analysis import AnalysisMethod, CorrectionMethod
+from .data import IcebergDataService
+
 
 class ExperimentType(str, Enum):
     AB_TEST = "ab_test"

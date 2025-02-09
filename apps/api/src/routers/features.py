@@ -1,11 +1,12 @@
-from fastapi import APIRouter, HTTPException, status, Depends
-from sqlalchemy.orm import Session
-from typing import List, Any
-from pydantic import BaseModel
+from typing import Any, List
 
-from ..db.session import get_db
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
 from ..db.base import FeatureDefinition as DBFeatureDefinition
-from ..middleware.error_handler import ValidationError, ResourceNotFoundError
+from ..db.session import get_db
+from ..middleware.error_handler import ResourceNotFoundError, ValidationError
 
 router = APIRouter()
 

@@ -1,9 +1,11 @@
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
-import json
+
 from pydantic import BaseModel
+
 
 class LogConfig(BaseModel):
     """Logging configuration"""

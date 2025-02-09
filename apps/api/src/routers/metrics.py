@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 from typing import List
 
-from ..db.session import get_db
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
 from ..db.base import MetricDefinition as DBMetricDefinition
+from ..db.session import get_db
+from ..middleware.error_handler import ResourceNotFoundError, ValidationError
 from ..models.metrics import MetricDefinition
-from ..middleware.error_handler import ValidationError, ResourceNotFoundError
 
 router = APIRouter()
 

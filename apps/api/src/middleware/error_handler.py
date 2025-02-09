@@ -1,9 +1,11 @@
+from typing import Any, Dict, Union
+
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
-from typing import Union, Dict, Any
 from sqlalchemy.exc import SQLAlchemyError
 
 from ..utils.logger import logger
+
 
 class ExperimentationError(Exception):
     """Base error for experimentation platform"""

@@ -1,9 +1,10 @@
-from typing import Dict, List, Optional
 from dataclasses import dataclass
+from typing import Dict, List, Optional
 
-from .frequentist import StatisticalAnalysisService, ExperimentResult
 from .bayesian import BayesianAnalysisService
 from .correction import MultipleTestingCorrection
+from .frequentist import ExperimentResult, StatisticalAnalysisService
+
 
 @dataclass
 class CombinedAnalysisResult:

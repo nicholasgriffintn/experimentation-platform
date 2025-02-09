@@ -1,20 +1,32 @@
 #!/bin/bash
 
+if [ -d ".venv" ]; then
+    source .venv/bin/activate
+elif [ -d "venv" ]; then
+    source venv/bin/activate
+else
+    echo "No virtual environment found. Please create one first:"
+    echo "python -m venv .venv"
+    echo "source .venv/bin/activate"
+    echo "pip install -e '.[dev]'"
+    exit 1
+fi
+
 function format() {
     echo "Formatting code..."
-    black src tests
-    isort src tests
+    python -m black src tests
+    python -m isort src tests
 }
 
 function lint() {
     echo "Linting code..."
-    ruff src tests
-    mypy src tests
+    python -m ruff src tests
+    python -m mypy src tests
 }
 
 function test() {
     echo "Running tests..."
-    pytest tests -v
+    python -m pytest tests -v
 }
 
 function all() {
@@ -37,7 +49,9 @@ case "$1" in
         all
         ;;
     *)
-        echo "Usage: $0 {format|lint|test|all}"
+        echo "🦍 Usage: $0 {format|lint|test|all}"
         exit 1
         ;;
-esac 
+esac
+
+deactivate 2>/dev/null 

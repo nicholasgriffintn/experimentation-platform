@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class ExperimentStatus(str, Enum):
     DRAFT = "draft"
     SCHEDULED = "scheduled"

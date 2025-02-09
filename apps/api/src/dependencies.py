@@ -1,15 +1,22 @@
 from functools import lru_cache
+
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from .db.session import get_db
-from .services.experiments import ExperimentService
-from .services.analysis import StatisticalAnalysisService, BayesianAnalysisService, MultipleTestingCorrection, CombinedAnalysisService
-from .services.data import IcebergDataService
-from .services.scheduler import ExperimentScheduler
-from .services.cache import RedisCache, CacheService
 from .config.app import settings
 from .config.iceberg import IcebergConfig, create_catalog
+from .db.session import get_db
+from .services.analysis import (
+    BayesianAnalysisService,
+    CombinedAnalysisService,
+    MultipleTestingCorrection,
+    StatisticalAnalysisService,
+)
+from .services.cache import CacheService, RedisCache
+from .services.data import IcebergDataService
+from .services.experiments import ExperimentService
+from .services.scheduler import ExperimentScheduler
+
 
 @lru_cache
 def get_iceberg_service() -> IcebergDataService:

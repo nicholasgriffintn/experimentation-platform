@@ -1,6 +1,7 @@
-from typing import Dict, Any
-from pydantic import BaseModel, Field
+from typing import Any, Dict
 from uuid import uuid4
+
+from pydantic import BaseModel, Field
 
 from .enums import VariantType
 

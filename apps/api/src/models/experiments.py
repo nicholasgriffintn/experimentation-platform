@@ -1,15 +1,13 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, model_validator
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
-from datetime import datetime
-from typing import Dict, Any, Optional
 
-from .enums import ExperimentStatus
-from .variants import VariantConfig
+from pydantic import BaseModel, Field, model_validator
+
 from .analysis import AnalysisConfig, MetricResult
+from .enums import ExperimentStatus, ExperimentType
 from .guardrails import GuardrailConfig
-from .enums import ExperimentType
+from .variants import VariantConfig
 
 
 class ExperimentBase(BaseModel):
