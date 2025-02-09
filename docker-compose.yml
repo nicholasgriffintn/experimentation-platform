@@ -13,10 +13,8 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=experiments
-      - POSTGRES_MULTIPLE_DATABASES=hive
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -78,40 +76,6 @@ services:
       mc anonymous set public minio/warehouse;
       exit 0;
       "
-
-  hive-metastore:
-    image: apache/hive:4.0.0-alpha-2
-    networks:
-      experimentation_net:
-        aliases:
-          - experimentation.hive
-    environment:
-      - SERVICE_NAME=metastore
-      - HIVE_DB_DRIVER=org.postgresql.Driver
-      - HIVE_DB_URL=jdbc:postgresql://experimentation.db:5432/hive
-      - HIVE_DB_USER=postgres
-      - HIVE_DB_PASS=postgres
-      - HIVE_METASTORE_DRIVER=org.postgresql.Driver
-      - HIVE_METASTORE_JDBC_URL=jdbc:postgresql://experimentation.db:5432/hive
-      - HIVE_METASTORE_USER=postgres
-      - HIVE_METASTORE_PASSWORD=postgres
-      - CORE_CONF_fs_defaultFS=file:///tmp
-      - HIVE_SITE_CONF_hive_metastore_uris=thrift://experimentation.hive:9083
-      - HIVE_SITE_CONF_hive_metastore_schema_verification=false
-      - HIVE_SITE_CONF_hive_metastore_connection_driver=org.postgresql.Driver
-      - HIVE_SITE_CONF_hive_metastore_connection_url=jdbc:postgresql://experimentation.db:5432/hive
-      - HIVE_SITE_CONF_hive_metastore_connection_username=postgres
-      - HIVE_SITE_CONF_hive_metastore_connection_password=postgres
-      - HIVE_SITE_CONF_datanucleus_autoCreateSchema=true
-      - HIVE_SITE_CONF_datanucleus_fixedDatastore=false
-      - HIVE_SITE_CONF_datanucleus_schema_autoCreateTables=true
-    volumes:
-      - ./docker/hive/conf:/opt/hive/conf
-    ports:
-      - "9083:9083"
-    depends_on:
-      db:
-        condition: service_healthy
 
   spark-master:
     image: bitnami/spark:latest
@@ -175,7 +139,6 @@ services:
       - CATALOG_S3_PATH_STYLE_ACCESS=true
     depends_on:
       - warehouse
-      - hive-metastore
 
 volumes:
   postgres_data:

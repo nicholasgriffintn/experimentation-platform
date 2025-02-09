@@ -1,10 +1,10 @@
 from functools import lru_cache
 
 from fastapi import Depends
+from pyiceberg.catalog import load_catalog
 from sqlalchemy.orm import Session
 
 from .config.app import settings
-from .config.iceberg_config import IcebergConfig, create_catalog
 from .db.session import get_db
 from .services.analysis import (
     BayesianAnalysisService,
@@ -21,13 +21,7 @@ from .services.scheduler import ExperimentScheduler
 @lru_cache
 def get_iceberg_service() -> IcebergDataService:
     """Get cached IcebergDataService instance."""
-    config = IcebergConfig(
-        warehouse_location=settings.warehouse_location,
-        aws_access_key_id=settings.aws_access_key_id,
-        aws_secret_access_key=settings.aws_secret_access_key,
-        aws_region=settings.aws_region,
-    )
-    catalog = create_catalog(config)
+    catalog = load_catalog(settings.iceberg_catalog_name, **settings.iceberg_catalog_config)
     return IcebergDataService(catalog=catalog)
 
 
