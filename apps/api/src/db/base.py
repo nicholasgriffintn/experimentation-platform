@@ -3,9 +3,11 @@ from typing import List
 from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, JSON, ForeignKey, Float, Integer, Boolean
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from ..models.experiment import (
+from ..models.experiments import (
     ExperimentStatus,
     ExperimentType,
+)
+from ..models.analysis import (
     AnalysisMethod,
     CorrectionMethod
 )

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from .data import IcebergDataService
 from .analysis import CombinedAnalysisService
 from .bucketing import BucketingService
-from ..models.experiment import AnalysisMethod, CorrectionMethod
+from ..models.analysis import AnalysisMethod, CorrectionMethod
 
 class ExperimentType(str, Enum):
     AB_TEST = "ab_test"

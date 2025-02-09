@@ -4,7 +4,7 @@ from typing import List
 
 from ..db.session import get_db
 from ..db.base import MetricDefinition as DBMetricDefinition
-from ..models.experiment import MetricDefinition
+from ..models.metrics import MetricDefinition
 from ..middleware.error_handler import ValidationError, ResourceNotFoundError
 
 router = APIRouter()

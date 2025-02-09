@@ -6,17 +6,17 @@ from uuid import uuid4
 
 from ..db.session import get_db
 from ..services.experiments import ExperimentService
-from ..models.experiment import (
+from ..models.experiments import (
     Experiment as ExperimentModel,
     ExperimentCreate,
-    VariantAssignment,
     ExperimentResults,
-    UserContext,
-    MetricEvent,
     ExperimentSchedule,
     ExperimentStatus,
     ExperimentType,
 )
+from ..models.variants import VariantAssignment
+from ..models.metrics import MetricEvent
+from ..models.user import UserContext
 from ..db.base import (
     Experiment as DBExperiment,
     MetricDefinition as DBMetricDefinition,

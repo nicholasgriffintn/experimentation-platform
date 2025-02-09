@@ -1,15 +1,19 @@
 from sqlalchemy.orm import Session
-from .base import (
-    FeatureDefinition, MetricDefinition, Experiment as DBExperiment,
-    Variant as DBVariant, ExperimentMetric, GuardrailMetric
-)
 from datetime import datetime, timedelta
 from pyiceberg.catalog import load_catalog
 from uuid import uuid4
 
-from ..models.experiment import (
-    ExperimentType, VariantType, 
-    ExperimentStatus, AnalysisMethod, CorrectionMethod
+from .base import (
+    FeatureDefinition, MetricDefinition, Experiment as DBExperiment,
+    Variant as DBVariant, ExperimentMetric, GuardrailMetric
+)
+from ..models.experiments import (
+    ExperimentType, 
+    ExperimentStatus
+)
+from ..models.variants import VariantType
+from ..models.analysis import (
+    AnalysisMethod, CorrectionMethod
 )
 from ..services.data import IcebergDataService
 from ..config.app import settings

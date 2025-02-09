@@ -1,6 +1,7 @@
 from typing import Dict, Optional
 import hashlib
-from ..models.experiment import VariantConfig, ExperimentType
+
+from ..models.experiments import VariantConfig, ExperimentType
 
 class BucketingService:
     """Service for consistently assigning users to experiment variants"""

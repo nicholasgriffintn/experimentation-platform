@@ -3,7 +3,7 @@ import numpy as np
 from scipy import stats
 from dataclasses import dataclass
 
-from ...models.experiment import MetricType
+from ...models.metrics import MetricType
 
 @dataclass
 class ExperimentResult:

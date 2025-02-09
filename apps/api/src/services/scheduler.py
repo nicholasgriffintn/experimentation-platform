@@ -4,7 +4,9 @@ import asyncio
 from sqlalchemy.orm import Session
 
 from ..db.base import Experiment
-from ..models.experiment import ExperimentStatus, GuardrailMetric, AnalysisMethod
+from ..models.experiments import ExperimentStatus
+from ..models.analysis import AnalysisMethod
+from ..models.guardrails import GuardrailMetric
 from .experiments import ExperimentService
 from ..utils.logger import logger
 
