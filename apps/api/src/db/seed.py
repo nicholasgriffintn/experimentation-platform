@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from ..config.app import settings
 from ..models.analysis_model import AnalysisMethod, CorrectionMethod
 from ..models.experiments_model import ExperimentStatus, ExperimentType
-from ..models.variants_model import VariantType
+from ..models.variants_model import VariantConfig, VariantType
+from ..models.guardrails_model import GuardrailOperator
 from ..services.data import IcebergDataService
 from ..utils.logger import logger
 from .base import Experiment as DBExperiment
@@ -109,7 +110,7 @@ def seed_test_metrics(db: Session) -> None:
 class GuardrailConfig(TypedDict):
     metric: str
     threshold: float
-    operator: str
+    operator: GuardrailOperator
 
 
 class ExperimentConfig(TypedDict):
@@ -122,7 +123,6 @@ class ExperimentConfig(TypedDict):
 async def seed_test_experiments(db: Session) -> None:
     """Seed test experiments covering various use cases."""
     now = datetime.utcnow()
-    data_service = get_data_service()
 
     experiments: List[ExperimentConfig] = [
         # 1. Simple A/B Test (Draft)
@@ -140,17 +140,17 @@ async def seed_test_experiments(db: Session) -> None:
                 correction_method=CorrectionMethod.NONE,
             ),
             "variants": [
-                DBVariant(
+                VariantConfig(
                     id=str(uuid4()),
                     name="control",
-                    type=VariantType.CONTROL.value,
+                    type=VariantType.CONTROL,
                     config={"color": "green"},
                     traffic_percentage=50,
                 ),
-                DBVariant(
+                VariantConfig(
                     id=str(uuid4()),
                     name="treatment",
-                    type=VariantType.TREATMENT.value,
+                    type=VariantType.TREATMENT,
                     config={"color": "blue"},
                     traffic_percentage=50,
                 ),
@@ -180,31 +180,31 @@ async def seed_test_experiments(db: Session) -> None:
                 num_samples=10000,
             ),
             "variants": [
-                DBVariant(
+                VariantConfig(
                     id=str(uuid4()),
                     name="control",
-                    type=VariantType.CONTROL.value,
+                    type=VariantType.CONTROL,
                     config={"layout": "classic", "hero": "product"},
                     traffic_percentage=25,
                 ),
-                DBVariant(
+                VariantConfig(
                     id=str(uuid4()),
                     name="layout_v1",
-                    type=VariantType.TREATMENT.value,
+                    type=VariantType.TREATMENT,
                     config={"layout": "modern", "hero": "product"},
                     traffic_percentage=25,
                 ),
-                DBVariant(
+                VariantConfig(
                     id=str(uuid4()),
                     name="layout_v2",
-                    type=VariantType.TREATMENT.value,
+                    type=VariantType.TREATMENT,
                     config={"layout": "classic", "hero": "lifestyle"},
                     traffic_percentage=25,
                 ),
-                DBVariant(
+                VariantConfig(
                     id=str(uuid4()),
                     name="layout_v3",
-                    type=VariantType.TREATMENT.value,
+                    type=VariantType.TREATMENT,
                     config={"layout": "modern", "hero": "lifestyle"},
                     traffic_percentage=25,
                 ),
@@ -232,23 +232,23 @@ async def seed_test_experiments(db: Session) -> None:
                 correction_method=CorrectionMethod.NONE,
             ),
             "variants": [
-                DBVariant(
+                VariantConfig(
                     id=str(uuid4()),
                     name="control",
-                    type=VariantType.CONTROL.value,
+                    type=VariantType.CONTROL,
                     config={"checkout_version": "current"},
                     traffic_percentage=50,
                 ),
-                DBVariant(
+                VariantConfig(
                     id=str(uuid4()),
                     name="new_flow",
-                    type=VariantType.FEATURE_FLAG.value,
+                    type=VariantType.FEATURE_FLAG,
                     config={"checkout_version": "new"},
                     traffic_percentage=50,
                 ),
             ],
             "metrics": ["conversion_rate", "average_order_value"],
-            "guardrails": [{"metric": "conversion_rate", "threshold": 0.9, "operator": "gt"}],
+            "guardrails": [{"metric": "conversion_rate", "threshold": 0.9, "operator": GuardrailOperator.GREATER_THAN}],
         },
         # 4. Completed A/B Test
         {
@@ -269,17 +269,17 @@ async def seed_test_experiments(db: Session) -> None:
                 correction_method=CorrectionMethod.HOLM,
             ),
             "variants": [
-                DBVariant(
+                VariantConfig(
                     id=str(uuid4()),
                     name="control",
-                    type=VariantType.CONTROL.value,
+                    type=VariantType.CONTROL,
                     config={"discount": 0},
                     traffic_percentage=50,
                 ),
-                DBVariant(
+                VariantConfig(
                     id=str(uuid4()),
                     name="discount",
-                    type=VariantType.TREATMENT.value,
+                    type=VariantType.TREATMENT,
                     config={"discount": 10},
                     traffic_percentage=50,
                 ),
@@ -306,17 +306,17 @@ async def seed_test_experiments(db: Session) -> None:
                 correction_method=CorrectionMethod.NONE,
             ),
             "variants": [
-                DBVariant(
+                VariantConfig(
                     id=str(uuid4()),
                     name="control",
-                    type=VariantType.CONTROL.value,
+                    type=VariantType.CONTROL,
                     config={"onboarding_steps": 5},
                     traffic_percentage=50,
                 ),
-                DBVariant(
+                VariantConfig(
                     id=str(uuid4()),
                     name="simplified",
-                    type=VariantType.TREATMENT.value,
+                    type=VariantType.TREATMENT,
                     config={"onboarding_steps": 3},
                     traffic_percentage=50,
                 ),
@@ -336,32 +336,37 @@ async def seed_test_experiments(db: Session) -> None:
             db.flush()
 
             try:
-                logger.info(f"Initializing Iceberg tables for experiment {exp.id}")
-                await data_service.initialize_experiment_tables(exp.id)
+                for variant_config in exp_config["variants"]:
+                    db_variant = DBVariant(
+                        id=variant_config.id,
+                        experiment_id=exp.id,
+                        name=variant_config.name,
+                        type=variant_config.type.value,
+                        config=variant_config.config,
+                        traffic_percentage=variant_config.traffic_percentage,
+                    )
+                    db.add(db_variant)
+
+                for metric_name in exp_config["metrics"]:
+                    metric = ExperimentMetric(experiment_id=exp.id, metric_name=metric_name)
+                    db.add(metric)
+
+                for guardrail in exp_config["guardrails"]:
+                    guardrail_metric = GuardrailMetric(
+                        experiment_id=exp.id,
+                        metric_name=guardrail["metric"],
+                        threshold=guardrail["threshold"],
+                        operator=str(guardrail["operator"].value),
+                    )
+                    db.add(guardrail_metric)
+
+                db.commit()
+                logger.info(f"Successfully seeded experiment {exp.id}")
+
             except Exception as e:
-                logger.warning(
-                    f"Failed to initialize Iceberg tables for experiment {exp.id}: {str(e)}"
-                )
-                pass
-
-            for variant in exp_config["variants"]:
-                variant.experiment_id = exp.id
-                db.add(variant)
-
-            for metric_name in exp_config["metrics"]:
-                metric = ExperimentMetric(experiment_id=exp.id, metric_name=metric_name)
-                db.add(metric)
-
-            for guardrail in exp_config["guardrails"]:
-                guardrail_metric = GuardrailMetric(
-                    experiment_id=exp.id,
-                    metric_name=guardrail["metric"],
-                    threshold=guardrail["threshold"],
-                    operator=guardrail["operator"],
-                )
-                db.add(guardrail_metric)
-
-    db.commit()
+                db.rollback()
+                logger.error(f"Failed to seed experiment {exp.name}: {str(e)}")
+                continue
 
 
 async def seed_all(db: Session) -> None:
