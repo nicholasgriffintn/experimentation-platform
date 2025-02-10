@@ -33,10 +33,10 @@ def get_data_service() -> IcebergDataService:
             )
             logger.info(f"Created {settings.iceberg_namespace} namespace")
         else:
-            logger.info(f"{settings.iceberg_namespace} namespace already exists")
+            pass
     except Exception as e:
         if "NamespaceAlreadyExistsException" in str(e):
-            logger.info(f"{settings.iceberg_namespace} namespace already exists")
+            pass
         else:
             logger.warning(f"Failed to handle namespace: {str(e)}")
 
@@ -336,6 +336,7 @@ async def seed_test_experiments(db: Session) -> None:
             db.flush()
 
             try:
+                logger.info(f"Initializing Iceberg tables for experiment {exp.id}")
                 await data_service.initialize_experiment_tables(exp.id)
             except Exception as e:
                 logger.warning(

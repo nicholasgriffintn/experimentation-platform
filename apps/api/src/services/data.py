@@ -24,9 +24,14 @@ class IcebergDataService:
         self.catalog = catalog
         self.schemas = IcebergSchemas()
 
-    async def initialize_experiment_tables(self, experiment_id: str) -> None:
-        """Initialize all required tables for a new experiment"""
+    async def initialize_experiment_tables(self, experiment_id: str) -> bool:
+        """Initialize all required tables for a new experiment
+        
+        Returns:
+            bool: True if all tables were created successfully or already exist, False otherwise
+        """
         namespace = "experiments"
+        tables_to_create = []
 
         events_spec = PartitionSpec(
             PartitionField(
@@ -34,10 +39,11 @@ class IcebergDataService:
             ),
             PartitionField(source_id=3, field_id=1001, transform=DayTransform(), name="timestamp"),
         )
-
-        self.create_table(
-            f"{namespace}.{experiment_id}_events", self.schemas.get_events_schema(), events_spec
-        )
+        tables_to_create.append((
+            f"{namespace}.{experiment_id}_events",
+            self.schemas.get_events_schema(),
+            events_spec
+        ))
 
         metrics_spec = PartitionSpec(
             PartitionField(
@@ -47,22 +53,22 @@ class IcebergDataService:
                 source_id=4, field_id=1001, transform=MonthTransform(), name="timestamp"
             ),
         )
-
-        self.create_table(
-            f"{namespace}.{experiment_id}_metrics", self.schemas.get_metrics_schema(), metrics_spec
-        )
+        tables_to_create.append((
+            f"{namespace}.{experiment_id}_metrics",
+            self.schemas.get_metrics_schema(),
+            metrics_spec
+        ))
 
         assignments_spec = PartitionSpec(
             PartitionField(
                 source_id=2, field_id=1000, transform=IdentityTransform(), name="experiment_id"
             )
         )
-
-        self.create_table(
+        tables_to_create.append((
             f"{namespace}.{experiment_id}_assignments",
             self.schemas.get_assignments_schema(),
-            assignments_spec,
-        )
+            assignments_spec
+        ))
 
         results_spec = PartitionSpec(
             PartitionField(
@@ -72,10 +78,20 @@ class IcebergDataService:
                 source_id=4, field_id=1001, transform=IdentityTransform(), name="metric_name"
             ),
         )
+        tables_to_create.append((
+            f"{namespace}.{experiment_id}_results",
+            self.schemas.get_results_schema(),
+            results_spec
+        ))
 
-        self.create_table(
-            f"{namespace}.{experiment_id}_results", self.schemas.get_results_schema(), results_spec
-        )
+        success = True
+        for table_name, schema, partition_spec in tables_to_create:
+            if not self.create_table(table_name, schema, partition_spec):
+                success = False
+                logger.error(f"Failed to create or verify table {table_name}")
+                break
+
+        return success
 
     def create_table(self, table_name: str, schema: Schema, partition_spec: PartitionSpec) -> bool:
         """Create a new Iceberg table"""

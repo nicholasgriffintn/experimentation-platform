@@ -95,12 +95,23 @@ class ExperimentService:
 
         return await self.data_service.get_experiment_config(experiment_id)
 
-    async def initialize_experiment(self, experiment_id: str, config: Dict) -> None:
-        """Initialize a new experiment with required infrastructure"""
-        await self.data_service.initialize_experiment_tables(experiment_id)
+    async def initialize_experiment(self, experiment_id: str, config: Dict) -> bool:
+        """Initialize a new experiment with required infrastructure
+        
+        Args:
+            experiment_id: The unique identifier for the experiment
+            config: The experiment configuration
+            
+        Returns:
+            bool: True if initialization was successful, False otherwise
+        """
+        if not await self.data_service.initialize_experiment_tables(experiment_id):
+            return False
 
         if self.cache_service:
             await self.cache_service.set_experiment_config(experiment_id, config)
+
+        return True
 
     async def assign_variant(
         self, experiment_id: str, user_context: Dict, targeting_type: str = "user_id"

@@ -66,6 +66,25 @@ class ExperimentScheduler:
     async def start_experiment(self, experiment: Experiment) -> None:
         """Start an experiment and schedule automated analysis if needed"""
         try:
+            config = {
+                "type": experiment.type,
+                "targeting_rules": experiment.targeting_rules,
+                "traffic_allocation": experiment.traffic_allocation,
+                "analysis_config": {
+                    "correction_method": experiment.correction_method,
+                    "alpha": experiment.confidence_level,
+                },
+                "variants": [v.to_dict() for v in experiment.variants],
+                "metrics": [m.to_dict() for m in experiment.metrics],
+            }
+            
+            if not await self.experiment_service.initialize_experiment(str(experiment.id), config):
+                logger.error(f"Failed to initialize infrastructure for experiment {experiment.id}")
+                setattr(experiment, "status", ExperimentStatus.FAILED)
+                setattr(experiment, "stopped_reason", "Failed to initialize experiment infrastructure")
+                self.db.commit()
+                return
+
             if experiment.ramp_up_period:
                 await self._apply_ramp_up_traffic(experiment)
             else:
@@ -80,6 +99,9 @@ class ExperimentScheduler:
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error starting experiment {experiment.id}: {str(e)}")
+            setattr(experiment, "status", ExperimentStatus.FAILED)
+            setattr(experiment, "stopped_reason", f"Failed to start experiment: {str(e)}")
+            self.db.commit()
 
     async def _apply_ramp_up_traffic(self, experiment: Experiment) -> None:
         """Apply initial traffic allocation for ramp-up"""
