@@ -5,10 +5,10 @@ from typing import Any, Dict, List, Optional, cast
 from pydantic import BaseModel
 
 from ..models.analysis_model import AnalysisMethod, CorrectionMethod
+from ..utils.logger import logger
 from .analysis import CombinedAnalysisService
 from .bucketing import BucketingService
 from .data import IcebergDataService
-from ..utils.logger import logger
 
 
 class ExperimentType(str, Enum):
@@ -98,11 +98,11 @@ class ExperimentService:
 
     async def initialize_experiment(self, experiment_id: str, config: Dict) -> bool:
         """Initialize a new experiment with required infrastructure
-        
+
         Args:
             experiment_id: The unique identifier for the experiment
             config: The experiment configuration
-            
+
         Returns:
             bool: True if initialization was successful, False otherwise
         """
@@ -222,7 +222,7 @@ class ExperimentService:
                 "end_time": config.get("end_time"),
                 "total_users": 0,
                 "metrics": {},
-                "correction_method": None
+                "correction_method": None,
             }
 
         metrics_results = {}
@@ -276,8 +276,14 @@ class ExperimentService:
                 variant_p_values[(metric_name, variant_id)] = len(all_p_values) - 1
                 metrics_results[metric_name][variant_id] = {
                     "sample_size": len(variant_data),
-                    "mean": float(analysis_result.frequentist_results.effect_size),
-                    "variance": float(analysis_result.frequentist_results.variance),
+                    "mean": float(analysis_result.frequentist_results.variant_mean),
+                    "variance": float(
+                        (
+                            analysis_result.frequentist_results.confidence_interval[1]
+                            - analysis_result.frequentist_results.confidence_interval[0]
+                        )
+                        / 3.92
+                    ),
                     "confidence_level": 0.95,
                     "p_value": float(analysis_result.frequentist_results.p_value),
                 }
@@ -315,7 +321,9 @@ class ExperimentService:
         }
 
         try:
-            await self.data_service.record_results(experiment_id=experiment_id, results_data=results)
+            await self.data_service.record_results(
+                experiment_id=experiment_id, results_data=results
+            )
         except Exception as e:
             logger.warning(f"Failed to record results for experiment {experiment_id}: {str(e)}")
 

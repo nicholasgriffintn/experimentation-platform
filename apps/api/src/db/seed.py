@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 from ..config.app import settings
 from ..models.analysis_model import AnalysisMethod, CorrectionMethod
 from ..models.experiments_model import ExperimentStatus, ExperimentType
-from ..models.variants_model import VariantConfig, VariantType
 from ..models.guardrails_model import GuardrailOperator
+from ..models.variants_model import VariantConfig, VariantType
 from ..services.data import IcebergDataService
 from ..utils.logger import logger
 from .base import Experiment as DBExperiment
@@ -115,7 +115,7 @@ class GuardrailConfig(TypedDict):
 
 class ExperimentConfig(TypedDict):
     exp: DBExperiment
-    variants: List[DBVariant]
+    variants: List[VariantConfig]
     metrics: List[str]
     guardrails: List[GuardrailConfig]
 
@@ -249,7 +249,13 @@ async def seed_test_experiments(db: Session) -> None:
                 ),
             ],
             "metrics": ["conversion_rate", "average_order_value"],
-            "guardrails": [{"metric": "conversion_rate", "threshold": 0.9, "operator": GuardrailOperator.GREATER_THAN}],
+            "guardrails": [
+                {
+                    "metric": "conversion_rate",
+                    "threshold": 0.9,
+                    "operator": GuardrailOperator.GREATER_THAN,
+                }
+            ],
         },
         # 4. Completed A/B Test
         {
@@ -339,7 +345,7 @@ async def seed_test_experiments(db: Session) -> None:
             try:
                 logger.info(f"Initializing Iceberg tables for experiment {exp.id}")
                 tables_initialized = await data_service.initialize_experiment_tables(exp.id)
-                
+
                 if not tables_initialized:
                     logger.error(f"Failed to initialize tables for experiment {exp.id}, skipping")
                     db.rollback()

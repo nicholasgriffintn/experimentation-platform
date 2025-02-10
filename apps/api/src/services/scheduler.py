@@ -74,14 +74,25 @@ class ExperimentScheduler:
                     "correction_method": experiment.correction_method,
                     "alpha": experiment.confidence_level,
                 },
-                "variants": [v.to_dict() for v in experiment.variants],
-                "metrics": [m.to_dict() for m in experiment.metrics],
+                "variants": [
+                    {
+                        "id": v.id,
+                        "name": v.name,
+                        "type": v.type,
+                        "config": v.config,
+                        "traffic_percentage": v.traffic_percentage,
+                    }
+                    for v in experiment.variants
+                ],
+                "metrics": [{"metric_name": m.metric_name} for m in experiment.metrics],
             }
-            
+
             if not await self.experiment_service.initialize_experiment(str(experiment.id), config):
                 logger.error(f"Failed to initialize infrastructure for experiment {experiment.id}")
-                setattr(experiment, "status", ExperimentStatus.FAILED)
-                setattr(experiment, "stopped_reason", "Failed to initialize experiment infrastructure")
+                setattr(experiment, "status", ExperimentStatus.STOPPED)
+                setattr(
+                    experiment, "stopped_reason", "Failed to initialize experiment infrastructure"
+                )
                 self.db.commit()
                 return
 
@@ -99,7 +110,7 @@ class ExperimentScheduler:
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error starting experiment {experiment.id}: {str(e)}")
-            setattr(experiment, "status", ExperimentStatus.FAILED)
+            setattr(experiment, "status", ExperimentStatus.STOPPED)
             setattr(experiment, "stopped_reason", f"Failed to start experiment: {str(e)}")
             self.db.commit()
 
