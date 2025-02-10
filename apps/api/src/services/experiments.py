@@ -8,6 +8,7 @@ from ..models.analysis_model import AnalysisMethod, CorrectionMethod
 from .analysis import CombinedAnalysisService
 from .bucketing import BucketingService
 from .data import IcebergDataService
+from ..utils.logger import logger
 
 
 class ExperimentType(str, Enum):
@@ -213,6 +214,17 @@ class ExperimentService:
         config = await self._get_experiment_config(experiment_id)
         metrics_to_analyze = metrics or [m.name for m in config["metrics"]]
 
+        if not metrics_to_analyze:
+            return {
+                "experiment_id": experiment_id,
+                "status": config.get("status", "running"),
+                "start_time": config.get("start_time", datetime.utcnow()),
+                "end_time": config.get("end_time"),
+                "total_users": 0,
+                "metrics": {},
+                "correction_method": None
+            }
+
         metrics_results = {}
         total_users = 0
         all_p_values = []
@@ -228,6 +240,9 @@ class ExperimentService:
             metric_data = await self._get_metric_data(experiment_id, metric_name)
             metrics_results[metric_name] = {}
 
+            if not metric_data:
+                continue
+
             control_data = metric_data.get("control", [])
             total_users = max(total_users, len(control_data))
 
@@ -236,6 +251,9 @@ class ExperimentService:
                     continue
 
                 total_users = max(total_users, len(variant_data))
+
+                if not variant_data:
+                    continue
 
                 analysis_config = config.get("analysis_config", {})
                 method = analysis_config.get("method", AnalysisMethod.FREQUENTIST)
@@ -256,7 +274,13 @@ class ExperimentService:
 
                 all_p_values.append(analysis_result.frequentist_results.p_value)
                 variant_p_values[(metric_name, variant_id)] = len(all_p_values) - 1
-                metrics_results[metric_name][variant_id] = analysis_result
+                metrics_results[metric_name][variant_id] = {
+                    "sample_size": len(variant_data),
+                    "mean": float(analysis_result.frequentist_results.effect_size),
+                    "variance": float(analysis_result.frequentist_results.variance),
+                    "confidence_level": 0.95,
+                    "p_value": float(analysis_result.frequentist_results.p_value),
+                }
 
                 if self.cache_service:
                     await self.cache_service.set_metric_stats(
@@ -275,8 +299,8 @@ class ExperimentService:
 
             for (metric_name, variant_id), p_value_idx in variant_p_values.items():
                 corrected_p_value = corrected_p_values[p_value_idx]
-                metrics_results[metric_name][variant_id].p_value = corrected_p_value
-                metrics_results[metric_name][variant_id].is_significant = (
+                metrics_results[metric_name][variant_id]["p_value"] = corrected_p_value
+                metrics_results[metric_name][variant_id]["is_significant"] = (
                     corrected_p_value < config.get("analysis_config", {}).get("alpha", 0.05)
                 )
 
@@ -290,7 +314,10 @@ class ExperimentService:
             "correction_method": correction_method if len(all_p_values) > 1 else None,
         }
 
-        await self.data_service.record_results(experiment_id=experiment_id, results_data=results)
+        try:
+            await self.data_service.record_results(experiment_id=experiment_id, results_data=results)
+        except Exception as e:
+            logger.warning(f"Failed to record results for experiment {experiment_id}: {str(e)}")
 
         return results
 
