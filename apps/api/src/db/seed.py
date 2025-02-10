@@ -123,6 +123,7 @@ class ExperimentConfig(TypedDict):
 async def seed_test_experiments(db: Session) -> None:
     """Seed test experiments covering various use cases."""
     now = datetime.utcnow()
+    data_service = get_data_service()
 
     experiments: List[ExperimentConfig] = [
         # 1. Simple A/B Test (Draft)
@@ -336,6 +337,14 @@ async def seed_test_experiments(db: Session) -> None:
             db.flush()
 
             try:
+                logger.info(f"Initializing Iceberg tables for experiment {exp.id}")
+                tables_initialized = await data_service.initialize_experiment_tables(exp.id)
+                
+                if not tables_initialized:
+                    logger.error(f"Failed to initialize tables for experiment {exp.id}, skipping")
+                    db.rollback()
+                    continue
+
                 for variant_config in exp_config["variants"]:
                     db_variant = DBVariant(
                         id=variant_config.id,

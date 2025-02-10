@@ -73,6 +73,10 @@ class Settings(BaseSettings):
             "io-impl": self.iceberg_io_impl,
             "s3.path-style-access": "true",
             "region": self.aws_region,
+            "rest.sigv4-enabled": "false",
+            "rest.client.verify-ssl": "false",
+            "rest.client.connect-timeout-ms": "10000",
+            "rest.client.socket-timeout-ms": "10000",
         }
 
 

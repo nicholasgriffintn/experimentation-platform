@@ -25,7 +25,7 @@ class IcebergSchemas:
             NestedField(
                 9,
                 "metadata",
-                MapType(key_type=StringType(), value_type=StringType()),
+                MapType(key_type=StringType(), value_type=StringType(), key_id=10, value_id=11),
                 required=False,
             ),
         )
@@ -45,7 +45,7 @@ class IcebergSchemas:
             NestedField(
                 8,
                 "metadata",
-                MapType(key_type=StringType(), value_type=StringType()),
+                MapType(key_type=StringType(), value_type=StringType(), key_id=9, value_id=10),
                 required=False,
             ),
         )
@@ -63,7 +63,7 @@ class IcebergSchemas:
             NestedField(
                 6,
                 "context",
-                MapType(key_type=StringType(), value_type=StringType()),
+                MapType(key_type=StringType(), value_type=StringType(), key_id=7, value_id=8),
                 required=False,
             ),
         )
@@ -86,7 +86,7 @@ class IcebergSchemas:
             NestedField(
                 11,
                 "metadata",
-                MapType(key_type=StringType(), value_type=StringType()),
+                MapType(key_type=StringType(), value_type=StringType(), key_id=12, value_id=13),
                 required=False,
             ),
         )
