@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import Enum
 from typing import Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel
@@ -9,24 +8,7 @@ from ..utils.logger import logger
 from .analysis import CombinedAnalysisService
 from .bucketing import BucketingService
 from .data import IcebergDataService
-
-
-class ExperimentType(str, Enum):
-    AB_TEST = "ab_test"
-    MULTIVARIATE = "multivariate"
-    FEATURE_FLAG = "feature_flag"
-
-
-class VariantType(str, Enum):
-    CONTROL = "control"
-    TREATMENT = "treatment"
-    FEATURE_FLAG = "feature_flag"
-
-
-class TargetingType(str, Enum):
-    USER_ID = "user_id"
-    SESSION_ID = "session_id"
-    CUSTOM = "custom"
+from ..models.enums import VariantType
 
 
 class VariantConfig(BaseModel):
