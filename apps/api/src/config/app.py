@@ -52,7 +52,13 @@ class Settings(BaseSettings):
     # Scheduler Settings
     scheduler_enabled: bool = True
     scheduler_check_interval: int = 60  # seconds
-
+    scheduler_ramp_up_period: int = 24  # hours
+    scheduler_ramp_up_initial_traffic: float = 10.0  # percentage
+    scheduler_ramp_up_steps: int = 5
+    scheduler_auto_analyze_interval: int = 3600  # 1 hour in seconds
+    scheduler_auto_stop_interval: int = 3600  # 1 hour in seconds
+    scheduler_auto_stop_delay: int = 60  # seconds
+    scheduler_auto_stop_threshold: float = 0.05  # percentage
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

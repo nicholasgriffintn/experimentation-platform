@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Set
 
 from sqlalchemy.orm import Session
 
+from ..config.app import settings
 from ..db.base import Experiment
 from ..models.analysis_model import AnalysisMethod
 from ..models.experiments_model import ExperimentStatus
@@ -13,8 +14,28 @@ from .experiments import ExperimentService
 
 
 class ExperimentScheduler:
+    """
+    Manages the lifecycle of A/B test experiments.
+
+    Key responsibilities:
+        - Starts and stops experiments based on scheduled times
+        - Handles traffic ramping for gradual rollouts
+        - Monitors experiments for guardrail violations
+        - Manages automated analysis and stopping conditions
+        - Tracks experiment sample sizes
+
+    Core workflow:
+        1. Scheduler runs on the configured interval
+        2. Checks for experiments that need to start/stop
+        3. Monitors running experiments for violations or completion criteria
+        4. Handles graceful experiment completion and cleanup
+    """
+
     def __init__(
-        self, experiment_service: ExperimentService, db: Session, check_interval: int = 60
+        self,
+        experiment_service: ExperimentService,
+        db: Session,
+        check_interval: int = settings.scheduler_check_interval,
     ) -> None:
         self.experiment_service = experiment_service
         self.db = db
@@ -23,7 +44,7 @@ class ExperimentScheduler:
         self.scheduled_tasks: Dict[str, asyncio.Task] = {}
 
     async def start(self) -> None:
-        """Start the scheduler"""
+        """Main scheduler loop that runs continuously to check experiments"""
         logger.info("Starting scheduler")
         self.running = True
         while self.running:
@@ -67,7 +88,7 @@ class ExperimentScheduler:
                     await self._check_auto_stop_conditions(experiment)
 
     async def start_experiment(self, experiment: Experiment) -> None:
-        """Start an experiment and schedule automated analysis if needed"""
+        """Initializes and starts an experiment, including ramp-up if configured"""
         try:
             logger.info(f"Starting experiment {experiment.id}")
             config = {
@@ -121,13 +142,13 @@ class ExperimentScheduler:
     async def _apply_ramp_up_traffic(self, experiment: Experiment) -> None:
         """Apply initial traffic allocation for ramp-up"""
         try:
-            initial_traffic_percentage = 10.0
+            initial_traffic_percentage = settings.scheduler_ramp_up_initial_traffic
             setattr(experiment, "traffic_allocation", initial_traffic_percentage)
             setattr(experiment, "status", ExperimentStatus.RUNNING)
             self.db.commit()
 
-            total_hours = experiment.ramp_up_period or 24
-            steps = 5
+            total_hours = experiment.ramp_up_period or settings.scheduler_ramp_up_period
+            steps = settings.scheduler_ramp_up_steps
             hours_per_step = total_hours / steps
 
             for step in range(1, steps + 1):
@@ -150,7 +171,7 @@ class ExperimentScheduler:
         self, experiment_id: str, delay_hours: float, target_percentage: float
     ) -> None:
         """Schedule a traffic increase after a delay"""
-        await asyncio.sleep(delay_hours * 3600)
+        await asyncio.sleep(delay_hours * settings.scheduler_check_interval)
 
         experiment = (
             self.db.query(Experiment)
@@ -229,7 +250,12 @@ class ExperimentScheduler:
         return False
 
     async def _check_auto_stop_conditions(self, experiment: Experiment) -> None:
-        """Check if any auto-stop conditions are met"""
+        """Evaluates if experiment should be stopped based on configured conditions:
+        - Sample size reached
+        - Statistical significance achieved
+        - Maximum duration exceeded
+        - Sequential testing thresholds met
+        """
         conditions = experiment.auto_stop_conditions
         if not conditions:
             return
@@ -246,7 +272,9 @@ class ExperimentScheduler:
 
             if getattr(experiment, "analysis_config", {}).get("sequential_testing"):
                 stopping_threshold = float(
-                    getattr(experiment, "analysis_config", {}).get("stopping_threshold", 0.01)
+                    getattr(experiment, "analysis_config", {}).get(
+                        "stopping_threshold", settings.scheduler_stopping_threshold
+                    )
                 )
                 method = getattr(experiment, "analysis_config", {}).get("method")
 
@@ -288,7 +316,10 @@ class ExperimentScheduler:
                 max_duration = int(conditions["max_duration_hours"])
                 if experiment.started_at:
                     duration = datetime.utcnow() - experiment.started_at
-                    if duration.total_seconds() / 3600 >= max_duration:
+                    if (
+                        duration.total_seconds() / settings.scheduler_auto_stop_interval
+                        >= max_duration
+                    ):
                         await self.stop_experiment(experiment, reason="Reached maximum duration")
                         return
 
@@ -298,7 +329,7 @@ class ExperimentScheduler:
             )
 
     async def stop_experiment(self, experiment: Experiment, reason: Optional[str] = None) -> None:
-        """Stop an experiment and run final analysis"""
+        """Gracefully stops an experiment and runs final analysis"""
         try:
             logger.info(f"Stopping experiment {experiment.id}")
             setattr(experiment, "status", ExperimentStatus.COMPLETED)
@@ -322,7 +353,7 @@ class ExperimentScheduler:
             logger.error(f"Error stopping experiment {experiment.id}: {str(e)}")
 
     async def _check_guardrails(self, experiment: Experiment) -> None:
-        """Check guardrail metrics for an experiment"""
+        """Monitors experiment metrics against defined safety thresholds"""
         try:
             for guardrail in experiment.guardrail_metrics:
                 metric_data = await self.experiment_service.data_service.get_metric_data(
