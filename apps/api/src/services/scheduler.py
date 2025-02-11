@@ -1,4 +1,5 @@
 import asyncio
+import time
 from datetime import datetime
 from typing import Dict, List, Optional, Set
 
@@ -11,6 +12,7 @@ from ..models.experiments_model import ExperimentStatus
 from ..models.guardrails_model import GuardrailMetric, GuardrailOperator
 from ..utils.logger import logger
 from .experiments import ExperimentService
+from .system_metrics import system_metrics
 
 
 class ExperimentScheduler:
@@ -46,6 +48,7 @@ class ExperimentScheduler:
     async def start(self) -> None:
         """Main scheduler loop that runs continuously to check experiments"""
         logger.info("Starting scheduler")
+        system_metrics.increment("scheduler", "start")
         self.running = True
         while self.running:
             await self.check_experiments()
@@ -54,43 +57,56 @@ class ExperimentScheduler:
     async def stop(self) -> None:
         """Stop the scheduler"""
         logger.info("Stopping scheduler")
+        system_metrics.increment("scheduler", "stop")
         self.running = False
         for task in self.scheduled_tasks.values():
             task.cancel()
 
     async def check_experiments(self) -> None:
         """If scheduled, start the experiment, stop if it should end. Check guardrails for running experiments."""
-        logger.info("Checking experiments")
-        now = datetime.utcnow()
+        start_time = time.time()
+        try:
+            logger.info("Checking experiments")
+            system_metrics.increment("scheduler", "check_experiments")
 
-        experiments = (
-            self.db.query(Experiment)
-            .filter(Experiment.status.in_([ExperimentStatus.DRAFT, ExperimentStatus.RUNNING]))
-            .all()
-        )
+            now = datetime.utcnow()
 
-        for experiment in experiments:
-            if (
-                experiment.status == ExperimentStatus.DRAFT
-                and experiment.start_time
-                and experiment.start_time <= now
-            ):
-                await self.start_experiment(experiment)
+            experiments = (
+                self.db.query(Experiment)
+                .filter(Experiment.status.in_([ExperimentStatus.DRAFT, ExperimentStatus.RUNNING]))
+                .all()
+            )
 
-            elif experiment.status == ExperimentStatus.RUNNING:
-                if experiment.end_time and experiment.end_time <= now:
-                    await self.stop_experiment(experiment)
-                    continue
+            for experiment in experiments:
+                if (
+                    experiment.status == ExperimentStatus.DRAFT
+                    and experiment.start_time
+                    and experiment.start_time <= now
+                ):
+                    await self.start_experiment(experiment)
 
-                await self._check_guardrails(experiment)
+                elif experiment.status == ExperimentStatus.RUNNING:
+                    if experiment.end_time and experiment.end_time <= now:
+                        await self.stop_experiment(experiment)
+                        continue
 
-                if experiment.auto_stop_conditions:
-                    await self._check_auto_stop_conditions(experiment)
+                    await self._check_guardrails(experiment)
+
+                    if experiment.auto_stop_conditions:
+                        await self._check_auto_stop_conditions(experiment)
+        except Exception as e:
+            system_metrics.increment("scheduler", "errors")
+            logger.error(f"Error in check_experiments: {str(e)}")
+        finally:
+            duration = time.time() - start_time
+            system_metrics.record_time("scheduler", "last_check_duration", duration)
 
     async def start_experiment(self, experiment: Experiment) -> None:
         """Initializes and starts an experiment, including ramp-up if configured"""
         try:
             logger.info(f"Starting experiment {experiment.id}")
+            system_metrics.increment("scheduler", "start_experiment")
+
             config = {
                 "type": experiment.type,
                 "targeting_rules": experiment.targeting_rules,
@@ -114,6 +130,7 @@ class ExperimentScheduler:
 
             if not await self.experiment_service.initialize_experiment(str(experiment.id), config):
                 logger.error(f"Failed to initialize infrastructure for experiment {experiment.id}")
+                system_metrics.increment("scheduler", "errors")
                 setattr(experiment, "status", ExperimentStatus.STOPPED)
                 setattr(
                     experiment, "stopped_reason", "Failed to initialize experiment infrastructure"
@@ -135,6 +152,7 @@ class ExperimentScheduler:
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error starting experiment {experiment.id}: {str(e)}")
+            system_metrics.increment("scheduler", "errors")
             setattr(experiment, "status", ExperimentStatus.STOPPED)
             setattr(experiment, "stopped_reason", f"Failed to start experiment: {str(e)}")
             self.db.commit()
@@ -163,7 +181,6 @@ class ExperimentScheduler:
                 )
 
         except Exception as e:
-            print(f"Error applying ramp-up for experiment {experiment.id}: {str(e)}")
             logger.error(f"Error applying ramp-up for experiment {experiment.id}: {str(e)}")
             raise
 
@@ -332,6 +349,7 @@ class ExperimentScheduler:
         """Gracefully stops an experiment and runs final analysis"""
         try:
             logger.info(f"Stopping experiment {experiment.id}")
+            system_metrics.increment("scheduler", "stop_experiment")
             setattr(experiment, "status", ExperimentStatus.COMPLETED)
             setattr(experiment, "ended_at", datetime.utcnow())
             setattr(experiment, "stopped_reason", reason)
@@ -351,6 +369,7 @@ class ExperimentScheduler:
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error stopping experiment {experiment.id}: {str(e)}")
+            system_metrics.increment("scheduler", "errors")
 
     async def _check_guardrails(self, experiment: Experiment) -> None:
         """Monitors experiment metrics against defined safety thresholds"""

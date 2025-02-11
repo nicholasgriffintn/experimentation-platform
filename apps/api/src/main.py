@@ -10,7 +10,7 @@ from .db.seed import seed_all
 from .db.session import engine
 from .dependencies import get_db, get_experiment_service
 from .middleware.error_handler import error_handler
-from .routers import experiments, features, metrics
+from .routers import experiments, features, metrics, system
 from .services.scheduler import ExperimentScheduler
 from .utils.logger import LogConfig, logger
 
@@ -32,6 +32,10 @@ tags_metadata = [
     {
         "name": "features",
         "description": "Manage feature definitions and configurations for experiments.",
+    },
+    {
+        "name": "system",
+        "description": "System metrics and health checks.",
     },
 ]
 
@@ -64,6 +68,7 @@ Base.metadata.create_all(bind=engine)
 app.include_router(experiments.router, prefix="/api/v1/experiments", tags=["experiments"])
 app.include_router(metrics.router, prefix="/api/v1/metrics", tags=["metrics"])
 app.include_router(features.router, prefix="/api/v1/features", tags=["features"])
+app.include_router(system.router, prefix="/api/v1/system", tags=["system"])
 
 scheduler = None
 
