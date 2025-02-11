@@ -72,7 +72,6 @@ scheduler = None
 async def startup_event() -> None:
     """Initialize services on startup."""
     if settings.scheduler_enabled:
-        logger.info("Starting scheduler")
         global scheduler
         db = next(get_db())
         experiment_service = get_experiment_service(db)
@@ -81,7 +80,7 @@ async def startup_event() -> None:
         )
         asyncio.create_task(scheduler.start())
     else:
-        logger.info("Scheduler is disabled")
+        logger.info("Scheduler is disabled in config")
 
     db = next(get_db())
     await seed_all(db)
@@ -91,7 +90,6 @@ async def startup_event() -> None:
 async def shutdown_event() -> None:
     """Clean up services on shutdown."""
     if scheduler:
-        logger.info("Stopping scheduler")
         await scheduler.stop()
 
 

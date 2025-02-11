@@ -24,6 +24,7 @@ class ExperimentScheduler:
 
     async def start(self) -> None:
         """Start the scheduler"""
+        logger.info("Starting scheduler")
         self.running = True
         while self.running:
             await self.check_experiments()
@@ -31,12 +32,14 @@ class ExperimentScheduler:
 
     async def stop(self) -> None:
         """Stop the scheduler"""
+        logger.info("Stopping scheduler")
         self.running = False
         for task in self.scheduled_tasks.values():
             task.cancel()
 
     async def check_experiments(self) -> None:
         """If scheduled, start the experiment, stop if it should end. Check guardrails for running experiments."""
+        logger.info("Checking experiments")
         now = datetime.utcnow()
 
         experiments = (
@@ -58,14 +61,15 @@ class ExperimentScheduler:
                     await self.stop_experiment(experiment)
                     continue
 
-                await self.check_guardrails(experiment)
+                await self._check_guardrails(experiment)
 
                 if experiment.auto_stop_conditions:
-                    await self.check_auto_stop_conditions(experiment)
+                    await self._check_auto_stop_conditions(experiment)
 
     async def start_experiment(self, experiment: Experiment) -> None:
         """Start an experiment and schedule automated analysis if needed"""
         try:
+            logger.info(f"Starting experiment {experiment.id}")
             config = {
                 "type": experiment.type,
                 "targeting_rules": experiment.targeting_rules,
@@ -105,7 +109,7 @@ class ExperimentScheduler:
             self.db.commit()
 
             if experiment.parameters.get("auto_analyze_interval"):
-                self.schedule_automated_analysis(experiment)
+                self._schedule_automated_analysis(experiment)
 
         except Exception as e:
             self.db.rollback()
@@ -203,7 +207,7 @@ class ExperimentScheduler:
             logger.error(f"Error getting sample size for experiment {experiment.id}: {str(e)}")
             return 0
 
-    def is_guardrail_violated(
+    def _is_guardrail_violated(
         self, metric_data: Dict[str, List[float]], guardrail: GuardrailMetric
     ) -> bool:
         """Check if a guardrail metric is violated"""
@@ -224,7 +228,7 @@ class ExperimentScheduler:
 
         return False
 
-    async def check_auto_stop_conditions(self, experiment: Experiment) -> None:
+    async def _check_auto_stop_conditions(self, experiment: Experiment) -> None:
         """Check if any auto-stop conditions are met"""
         conditions = experiment.auto_stop_conditions
         if not conditions:
@@ -296,6 +300,7 @@ class ExperimentScheduler:
     async def stop_experiment(self, experiment: Experiment, reason: Optional[str] = None) -> None:
         """Stop an experiment and run final analysis"""
         try:
+            logger.info(f"Stopping experiment {experiment.id}")
             setattr(experiment, "status", ExperimentStatus.COMPLETED)
             setattr(experiment, "ended_at", datetime.utcnow())
             setattr(experiment, "stopped_reason", reason)
@@ -316,7 +321,7 @@ class ExperimentScheduler:
             self.db.rollback()
             logger.error(f"Error stopping experiment {experiment.id}: {str(e)}")
 
-    async def check_guardrails(self, experiment: Experiment) -> None:
+    async def _check_guardrails(self, experiment: Experiment) -> None:
         """Check guardrail metrics for an experiment"""
         try:
             for guardrail in experiment.guardrail_metrics:
@@ -331,13 +336,13 @@ class ExperimentScheduler:
                     operator=GuardrailOperator(guardrail.operator),
                 )
 
-                if self.is_guardrail_violated(metric_data, model_guardrail):
-                    await self.handle_guardrail_violation(experiment, model_guardrail)
+                if self._is_guardrail_violated(metric_data, model_guardrail):
+                    await self._handle_guardrail_violation(experiment, model_guardrail)
 
         except Exception as e:
             logger.error(f"Error checking guardrails for experiment {experiment.id}: {str(e)}")
 
-    async def handle_guardrail_violation(
+    async def _handle_guardrail_violation(
         self, experiment: Experiment, guardrail: GuardrailMetric
     ) -> None:
         """Handle a guardrail violation"""
@@ -358,7 +363,7 @@ class ExperimentScheduler:
             f"Guardrail violation in experiment {experiment.id}: {guardrail.metric_name}"
         )
 
-    def schedule_automated_analysis(self, experiment: Experiment) -> None:
+    def _schedule_automated_analysis(self, experiment: Experiment) -> None:
         """Schedule automated analysis for an experiment"""
         interval = experiment.parameters.get("auto_analyze_interval")
         if not interval:

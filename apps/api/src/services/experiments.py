@@ -211,6 +211,7 @@ class ExperimentService:
         self, experiment_id: str, metrics: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """Analyze current experiment results with multiple testing correction"""
+        logger.info(f"Analyzing results for experiment {experiment_id}")
         config = await self._get_experiment_config(experiment_id)
         metrics_to_analyze = metrics or [m.name for m in config["metrics"]]
 
