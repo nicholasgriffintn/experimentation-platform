@@ -6,6 +6,7 @@
     import { createEventDispatcher } from 'svelte';
     import { formatDateToISO } from '$lib/utils/date';
     import Button from '../common/Button.svelte';
+    import Dialog from '../common/Dialog.svelte';
 
     export let experiment: Partial<ExperimentCreate> = {};
     export let submitLabel = 'Save Experiment';
@@ -42,6 +43,10 @@
 
     let selectedFeature: FeatureDefinition | null = null;
     let selectedFeatureName = '';
+
+    let configKeyDialog = false;
+    let currentVariantIndex: number | null = null;
+    let newConfigKey = '';
 
     function getBayesianValue(value: number | undefined, defaultValue: number): number {
         return value ?? defaultValue;
@@ -160,13 +165,18 @@
     }
 
     function addConfigKey(variantIndex: number) {
-        const key = prompt('Enter config key:');
-        if (key && !variants[variantIndex].config[key]) {
-            const variant = variants[variantIndex];
+        currentVariantIndex = variantIndex;
+        configKeyDialog = true;
+    }
+
+    function handleConfigKeyConfirm(key: string) {
+        if (currentVariantIndex !== null && key && !variants[currentVariantIndex].config[key]) {
+            const variant = variants[currentVariantIndex];
             const updatedConfig = { ...variant.config, [key]: '' };
-            variants[variantIndex] = { ...variant, config: updatedConfig };
+            variants[currentVariantIndex] = { ...variant, config: updatedConfig };
             variants = [...variants];
         }
+        currentVariantIndex = null;
     }
 
     function addGuardrailMetric(metric_name: string) {
@@ -738,4 +748,14 @@
             {submitLabel}
         </Button>
     </div>
+
+    <Dialog
+        title="Add Configuration Key"
+        isOpen={configKeyDialog}
+        inputLabel="Config Key"
+        inputPlaceholder="Enter configuration key name"
+        confirmLabel="Add"
+        on:confirmSingle={e => handleConfigKeyConfirm(e.detail)}
+        on:cancel={() => configKeyDialog = false}
+    />
 </form> 

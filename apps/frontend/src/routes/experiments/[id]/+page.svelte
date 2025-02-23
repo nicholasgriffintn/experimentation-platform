@@ -6,9 +6,49 @@
 	import Button from '../../../components/common/Button.svelte';
 	import CardLink from '../../../components/common/CardLink.svelte';
 	import StatusBadge from '../../../components/common/StatusBadge.svelte';
+	import Dialog from '../../../components/common/Dialog.svelte';
 
 	export let data: PageData;
 	$: experiment = data.experiment as Experiment;
+
+	let stopDialog = false;
+	let pauseDialog = false;
+	let scheduleDialog = false;
+	let scheduleInputs: Array<{
+		label: string;
+		placeholder: string;
+		value: string;
+		required?: boolean;
+	}>;
+
+	$: {
+		const defaultSchedule: Partial<ExperimentSchedule> = {
+			start_time: undefined,
+			end_time: undefined,
+			ramp_up_period: undefined,
+			auto_stop_conditions: undefined
+		};
+		const currentSchedule = experiment.schedule || defaultSchedule;
+		
+		scheduleInputs = [
+			{
+				label: 'Start Time',
+				placeholder: 'YYYY-MM-DD HH:mm',
+				value: currentSchedule.start_time ? new Date(currentSchedule.start_time).toISOString().slice(0, 16) : '',
+				required: true
+			},
+			{
+				label: 'End Time (Optional)',
+				placeholder: 'YYYY-MM-DD HH:mm',
+				value: currentSchedule.end_time ? new Date(currentSchedule.end_time).toISOString().slice(0, 16) : ''
+			},
+			{
+				label: 'Ramp Up Period (hours, Optional)',
+				placeholder: 'Enter number of hours',
+				value: currentSchedule.ramp_up_period?.toString() || ''
+			}
+		];
+	}
 
 	onMount(async () => {
 		await loadExperimentData();
@@ -19,16 +59,26 @@
 	}
 
 	async function handleStopExperiment(id: string) {
-		const reason = prompt('Please provide a reason for stopping the experiment:');
-		if (reason !== null) {
-			await experimentActions.stopExperiment(id, reason);
-		}
+		stopDialog = true;
 	}
 
 	async function handlePauseExperiment(id: string) {
-		const reason = prompt('Please provide a reason for pausing the experiment:');
-		if (reason !== null) {
-			await experimentActions.pauseExperiment(id, reason);
+		pauseDialog = true;
+	}
+
+	async function onStopConfirm(event: CustomEvent<string | Record<string, string>>) {
+		const reason = typeof event.detail === 'string' ? event.detail : '';
+		if (reason) {
+			await experimentActions.stopExperiment(experiment.id, reason);
+			stopDialog = false;
+		}
+	}
+
+	async function onPauseConfirm(event: CustomEvent<string | Record<string, string>>) {
+		const reason = typeof event.detail === 'string' ? event.detail : '';
+		if (reason) {
+			await experimentActions.pauseExperiment(experiment.id, reason);
+			pauseDialog = false;
 		}
 	}
 
@@ -37,27 +87,14 @@
 	}
 
 	async function handleScheduleUpdate(id: string) {
-		const defaultSchedule: Partial<ExperimentSchedule> = {
-			start_time: undefined,
-			end_time: undefined,
-			ramp_up_period: undefined,
-			auto_stop_conditions: undefined
-		};
-		const currentSchedule = experiment.schedule || defaultSchedule;
-		const startTime = prompt('Enter start time (YYYY-MM-DD HH:mm):', 
-			currentSchedule.start_time ? new Date(currentSchedule.start_time).toISOString().slice(0, 16) : ''
-		);
-		if (startTime === null) return;
+		scheduleDialog = true;
+	}
 
-		const endTime = prompt('Enter end time (YYYY-MM-DD HH:mm) or leave empty:', 
-			currentSchedule.end_time ? new Date(currentSchedule.end_time).toISOString().slice(0, 16) : ''
-		);
-		if (endTime === null) return;
-
-		const rampUpPeriod = prompt('Enter ramp up period in hours (optional):', 
-			currentSchedule.ramp_up_period?.toString() || ''
-		);
-		if (rampUpPeriod === null) return;
+	async function onScheduleConfirm(event: CustomEvent<string | Record<string, string>>) {
+		const values = typeof event.detail === 'string' ? {} : event.detail;
+		const startTime = values.input0;
+		const endTime = values.input1;
+		const rampUpPeriod = values.input2;
 
 		if (!startTime) {
 			error.set('Start time is required');
@@ -71,7 +108,8 @@
 			auto_stop_conditions: undefined
 		};
 
-		await experimentActions.updateSchedule(id, schedule);
+		await experimentActions.updateSchedule(experiment.id, schedule);
+		scheduleDialog = false;
 	}
 
 	function getStatusClasses(status: Experiment['status']): string {
@@ -352,4 +390,36 @@
 			{/if}
 		</div>
 	{/if}
+
+	<Dialog
+		title="Stop Experiment"
+		isOpen={stopDialog}
+		inputLabel="Reason"
+		inputPlaceholder="Please provide a reason for stopping the experiment"
+		confirmLabel="Stop"
+		description="This action will stop the experiment. Please provide a reason for stopping."
+		on:confirm={onStopConfirm}
+		on:cancel={() => stopDialog = false}
+	/>
+
+	<Dialog
+		title="Pause Experiment"
+		isOpen={pauseDialog}
+		inputLabel="Reason"
+		inputPlaceholder="Please provide a reason for pausing the experiment"
+		confirmLabel="Pause"
+		description="This action will pause the experiment. Please provide a reason for pausing."
+		on:confirm={onPauseConfirm}
+		on:cancel={() => pauseDialog = false}
+	/>
+
+	<Dialog
+		title="Schedule Update"
+		isOpen={scheduleDialog}
+		inputs={scheduleInputs}
+		confirmLabel="Update"
+		description="This action will update the experiment schedule. Please enter the new schedule details."
+		on:confirm={onScheduleConfirm}
+		on:cancel={() => scheduleDialog = false}
+	/>
 </div> 
