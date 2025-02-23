@@ -93,9 +93,7 @@
                 href="/metrics/{encodeURIComponent(metric.name)}"
             >
                 <div class="mt-4">
-                    <pre class="p-3 bg-gray-50 rounded text-sm font-mono overflow-x-auto">
-                        {metric.query_template}
-                    </pre>
+                    <pre class="p-3 bg-gray-50 rounded text-sm font-mono overflow-x-auto whitespace-pre-line">{metric.query_template}</pre>
                 </div>
             </ResourceCard>
         {/each}

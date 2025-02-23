@@ -117,9 +117,9 @@
 
                     <div class="bg-white p-6 rounded-lg shadow">
                         <h2 class="text-xl font-semibold mb-4">Query Template</h2>
-                        <pre class="p-4 bg-gray-50 rounded text-sm font-mono overflow-x-auto whitespace-pre-wrap break-all">
-                            {metric.query_template}
-                        </pre>
+                        <div class="mt-4">
+                            <pre class="p-3 bg-gray-50 rounded text-sm font-mono overflow-x-auto whitespace-pre-line">{metric.query_template}</pre>
+                        </div>
                     </div>
                 </div>
             {/if}
