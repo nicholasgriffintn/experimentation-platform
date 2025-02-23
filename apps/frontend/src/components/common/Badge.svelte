@@ -25,6 +25,6 @@
     };
 </script>
 
-<span class="text-sm rounded-full {sizeClasses[size]} {getVariantClasses(variant)}">
+<span class="text-sm rounded-md {sizeClasses[size]} {getVariantClasses(variant)}">
     {label}: {value}
 </span> 

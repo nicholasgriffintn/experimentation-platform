@@ -27,6 +27,6 @@
     };
 </script>
 
-<span class="text-sm rounded-full {sizeClasses[size]} {getStatusClasses(status)}">
+<span class="text-sm rounded-md {sizeClasses[size]} {getStatusClasses(status)}">
     {status}
 </span> 
