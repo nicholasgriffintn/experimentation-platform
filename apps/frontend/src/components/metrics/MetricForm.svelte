@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { MetricDefinition } from '$lib/types/api';
+    import type { MetricDefinition } from '../../types/api';
     import { createEventDispatcher } from 'svelte';
 
     export let metric: Partial<MetricDefinition> = {};

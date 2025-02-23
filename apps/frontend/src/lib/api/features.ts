@@ -1,5 +1,5 @@
 import { BaseAPI } from './base';
-import type { FeatureDefinition } from '../types/api';
+import type { FeatureDefinition } from '../../types/api';
 
 export class FeaturesAPI extends BaseAPI {
     constructor() {

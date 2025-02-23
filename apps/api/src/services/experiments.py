@@ -4,11 +4,11 @@ from typing import Any, Dict, List, Optional, cast
 from pydantic import BaseModel
 
 from ..models.analysis_model import AnalysisMethod, CorrectionMethod
+from ..models.enums import VariantType
 from ..utils.logger import logger
 from .analysis import CombinedAnalysisService
 from .bucketing import BucketingService
 from .data import IcebergDataService
-from ..models.enums import VariantType
 
 
 class VariantConfig(BaseModel):

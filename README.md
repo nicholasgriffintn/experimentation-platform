@@ -9,7 +9,7 @@ This is a new free, open source experimentation platform. The purpose is to prov
 To get started, run the following script:
 
 ```bash
-./scripts/run.sh
+sh ./scripts/run.sh
 ```
 
 This will setup the required services and start the API and analysis services.

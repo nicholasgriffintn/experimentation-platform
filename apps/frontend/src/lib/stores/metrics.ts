@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 
-import type { MetricDefinition } from '../types/api';
+import type { MetricDefinition } from '../../types/api';
 import { api } from '../api';
 
 export const metrics = writable<MetricDefinition[]>([]);

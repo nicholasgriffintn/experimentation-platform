@@ -8,5 +8,10 @@
     "onlyBuiltDependencies": [
       "esbuild"
     ]
+  },
+  "scripts": {
+    "dev:frontend": "pnpm --filter @experimentation-platform/frontend dev",
+    "dev:api": "pnpm --filter @experimentation-platform/api dev",
+    "dev": "pnpm --filter @experimentation-platform/frontend --filter @experimentation-platform/api dev"
   }
 }

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
         "http://localhost:5173",  # Vite dev server
         "http://localhost:4173",  # Vite preview
         "http://localhost:3000",  # Alternative dev port
+        "http://localhost:3001",  # Alternative dev port
     ]
 
     # Iceberg Settings

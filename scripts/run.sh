@@ -59,7 +59,7 @@ fi
 
 # Check MinIO
 echo "Checking MinIO..."
-if curl -s -f http://localhost:9000 > /dev/null; then
+if curl -s -f http://localhost:9000/minio/health/live > /dev/null; then
     echo "✅ MinIO is running"
 else
     echo "❌ MinIO is not responding"
@@ -71,3 +71,4 @@ echo "- API: http://localhost:8000"
 echo "- MinIO Console: http://localhost:9001"
 echo "- Spark UI: http://localhost:8080"
 echo "- Iceberg REST: http://localhost:8181"
+echo "Please start the frontend and api services separately with the command 'pnpm run dev'."

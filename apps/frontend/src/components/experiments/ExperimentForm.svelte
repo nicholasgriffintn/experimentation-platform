@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     import { metrics as metricsStore, metricActions } from '$lib/stores/metrics';
     import { features as featuresStore, featureActions } from '$lib/stores/features';
-    import type { ExperimentType, VariantType, Variant, ExperimentCreate, ExperimentSchedule, GuardrailConfig, GuardrailOperator, AnalysisConfig, FeatureDefinition } from '$lib/types/api';
+    import type { ExperimentType, VariantType, Variant, ExperimentCreate, ExperimentSchedule, GuardrailConfig, GuardrailOperator, AnalysisConfig, FeatureDefinition } from '../../types/api';
     import { createEventDispatcher } from 'svelte';
     import { formatDateToISO } from '$lib/utils/date';
 

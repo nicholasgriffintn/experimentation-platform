@@ -8,6 +8,8 @@ importers:
 
   .: {}
 
+  apps/api: {}
+
   apps/frontend:
     devDependencies:
       '@sveltejs/adapter-auto':

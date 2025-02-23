@@ -1,6 +1,6 @@
 import { BaseAPI } from './base';
 import { config } from '../config';
-import type { MetricDefinition } from '../types/api';
+import type { MetricDefinition } from '../../types/api';
 
 export class MetricsAPI extends BaseAPI {
     constructor() {

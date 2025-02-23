@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import { experimentResults, loading, error, experimentActions } from '$lib/stores/experiments';
-	import type { Experiment, ExperimentSchedule } from '$lib/types/api';
+	import type { Experiment, ExperimentSchedule } from '../../../types/api';
 
 	export let data: PageData;
 	$: experiment = data.experiment as Experiment;

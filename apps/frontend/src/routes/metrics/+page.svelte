@@ -1,5 +1,5 @@
 <script lang="ts">
-	import MetricsList from '$lib/components/metrics/MetricsList.svelte';
+	import MetricsList from '../../components/metrics/MetricsList.svelte';
 	import type { PageData } from './$types';
 
 	export let data: PageData;

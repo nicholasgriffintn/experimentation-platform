@@ -7,7 +7,7 @@ import type {
     UserContext,
     ExperimentResults,
     ExperimentSchedule
-} from '../types/api';
+} from '../../types/api';
 
 export class ExperimentsAPI extends BaseAPI {
     constructor() {
