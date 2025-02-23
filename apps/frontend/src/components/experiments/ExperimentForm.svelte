@@ -581,6 +581,7 @@
                     <span class="text-sm font-medium">Enable Sequential Testing</span>
                 </label>
                 {#if analysis_config.sequential_testing}
+                    <label for="stopping_threshold" class="block text-sm font-medium">Stopping Threshold</label>
                     <input
                         type="number"
                         bind:value={analysis_config.stopping_threshold}
