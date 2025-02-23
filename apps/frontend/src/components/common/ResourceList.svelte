@@ -1,5 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher } from 'svelte';
+    import Button from './Button.svelte';
 
     export let title: string;
     export let items: any[] = [];
@@ -18,12 +19,12 @@
 <div class="space-y-6">
     <div class="flex justify-between items-center">
         <h2 class="text-3xl font-bold">{title}</h2> 
-        <button
+        <Button
+            variant="primary"
             on:click={() => dispatch('create')}
-            class="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
         >
             {createButtonLabel}
-        </button>
+        </Button>
     </div>
 
     {#if error}

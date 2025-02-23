@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.postcss';
 	import { page } from '$app/stores';
+	import NavLink from '../components/common/NavLink.svelte';
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -15,33 +16,24 @@
 					</div>
 
 					<div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-						<a
+						<NavLink
 							href="/"
-							class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium
-							{$page.url.pathname === '/' ? 
-								'border-blue-500 text-gray-900' : 
-								'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'}"
+							active={$page.url.pathname === '/'}
 						>
 							Dashboard
-						</a>
-						<a
+						</NavLink>
+						<NavLink
 							href="/experiments"
-							class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium
-							{$page.url.pathname.startsWith('/experiments') ? 
-								'border-blue-500 text-gray-900' : 
-								'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'}"
+							active={$page.url.pathname.startsWith('/experiments')}
 						>
 							Experiments
-						</a>
-						<a
+						</NavLink>
+						<NavLink
 							href="/metrics"
-							class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium
-							{$page.url.pathname.startsWith('/metrics') ? 
-								'border-blue-500 text-gray-900' : 
-								'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'}"
+							active={$page.url.pathname.startsWith('/metrics')}
 						>
 							Metrics
-						</a>
+						</NavLink>
 					</div>
 				</div>
 			</div>

@@ -4,6 +4,7 @@
     import type { PageData } from './$types';
     import type { MetricDefinition } from '../../../types/api';
     import MetricForm from '../../../components/metrics/MetricForm.svelte';
+    import Button from '../../../components/common/Button.svelte';
 
     export let data: PageData;
     $: metric = data.metric as MetricDefinition;
@@ -53,18 +54,18 @@
                 </div>
                 <div class="flex space-x-4">
                     {#if !isEditing}
-                        <button
+                        <Button
+                            variant="outline"
                             on:click={() => isEditing = true}
-                            class="px-4 py-2 text-blue-600 border border-blue-600 rounded-md hover:bg-blue-50"
                         >
                             Edit Metric
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="danger"
                             on:click={handleDelete}
-                            class="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700"
                         >
                             Delete Metric
-                        </button>
+                        </Button>
                     {/if}
                 </div>
             </div>

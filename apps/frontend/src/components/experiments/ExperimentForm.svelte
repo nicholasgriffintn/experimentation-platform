@@ -5,9 +5,10 @@
     import type { ExperimentType, VariantType, Variant, ExperimentCreate, ExperimentSchedule, GuardrailConfig, GuardrailOperator, AnalysisConfig, FeatureDefinition } from '../../types/api';
     import { createEventDispatcher } from 'svelte';
     import { formatDateToISO } from '$lib/utils/date';
+    import Button from '../common/Button.svelte';
 
     export let experiment: Partial<ExperimentCreate> = {};
-    export let submitLabel = 'Create Experiment';
+    export let submitLabel = 'Save Experiment';
     export let loading = false;
 
     const dispatch = createEventDispatcher<{
@@ -370,27 +371,28 @@
                                             class="w-full px-3 py-2 border rounded-md"
                                         />
                                     </div>
-                                    <button
-                                        type="button"
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
                                         on:click={() => removeGuardrailMetric(i)}
                                         disabled={loading}
-                                        class="px-2 py-1 text-red-600 hover:bg-red-50 rounded"
+                                        class="!text-red-600 !border-red-600 hover:!bg-red-50"
                                     >
                                         Remove
-                                    </button>
+                                    </Button>
                                 </div>
                             {/each}
 
                             <div class="flex flex-wrap gap-2">
                                 {#each $metricsStore.filter(m => !guardrail_metrics.some(g => g.metric_name === m.name)) as metric}
-                                    <button
-                                        type="button"
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
                                         on:click={() => addGuardrailMetric(metric.name)}
                                         disabled={loading}
-                                        class="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded-full border border-blue-200"
                                     >
                                         + Add {metric.name} as guardrail
-                                    </button>
+                                    </Button>
                                 {/each}
                             </div>
                         </div>
@@ -403,14 +405,14 @@
     <div class="space-y-4">
         <div class="flex justify-between items-center">
             <h3 class="text-lg font-semibold">Variants</h3>
-            <button
-                type="button"
+            <Button
+                variant="outline"
+                size="sm"
                 on:click={addVariant}
                 disabled={loading}
-                class="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded"
             >
                 Add Variant
-            </button>
+            </Button>
         </div>
 
         <div class="space-y-4">
@@ -419,13 +421,13 @@
                     <div class="flex items-center justify-between">
                         <h4 class="font-medium">{variant.name}</h4>
                         {#if variants.length > 2}
-                            <button
-                                type="button"
+                            <Button
+                                variant="danger"
+                                size="sm"
                                 on:click={() => removeVariant(i)}
-                                class="text-red-600 hover:text-red-800"
                             >
                                 Remove
-                            </button>
+                            </Button>
                         {/if}
                     </div>
 
@@ -452,22 +454,22 @@
                                         on:input={(event) => updateVariantConfig(i, key, event)}
                                         class="flex-grow px-3 py-2 border rounded-md"
                                     />
-                                    <button
-                                        type="button"
+                                    <Button
+                                        variant="danger"
+                                        size="sm"
                                         on:click={() => removeConfigKey(i, key)}
-                                        class="text-red-600 hover:text-red-800"
                                     >
                                         Remove
-                                    </button>
+                                    </Button>
                                 </div>
                             {/each}
-                            <button
-                                type="button"
+                            <Button
+                                variant="outline"
+                                size="sm"
                                 on:click={() => addConfigKey(i)}
-                                class="text-blue-600 hover:text-blue-800"
                             >
                                 Add Config
-                            </button>
+                            </Button>
                         </div>
                     {/if}
 
@@ -717,23 +719,23 @@
     {/if}
 
     <div class="flex justify-end space-x-3">
-        <button
+        <Button
+            variant="secondary"
             type="button"
             on:click={() => dispatch('cancel')}
             disabled={loading}
-            class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md"
         >
             Cancel
-        </button>
-        <button
+        </Button>
+        <Button
+            variant="primary"
             type="submit"
             disabled={loading}
-            class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md"
         >
             {#if loading}
                 <span class="inline-block animate-spin mr-2">⌛</span>
             {/if}
             {submitLabel}
-        </button>
+        </Button>
     </div>
 </form> 

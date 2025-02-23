@@ -3,6 +3,7 @@
     import { metrics, loading, error, metricActions } from '$lib/stores/metrics';
     import ResourceList from '../common/ResourceList.svelte';
     import ResourceCard from '../common/ResourceCard.svelte';
+    import Badge from '../common/Badge.svelte';
     import type { MetricDefinition } from '../../types/api';
     import { goto } from '$app/navigation';
 
@@ -17,17 +18,57 @@
     });
 
     function getMetricTags(metric: MetricDefinition) {
-        const tags = [
-            { label: 'Unit', value: metric.unit },
-            { label: 'Aggregation', value: metric.aggregation_method }
+        const tags: Array<{label: string; value: string | number; component?: any; props?: Record<string, any>}> = [
+            { 
+                label: 'Unit',
+                value: metric.unit,
+                component: Badge,
+                props: { 
+                    label: 'Unit',
+                    value: metric.unit,
+                    variant: 'default',
+                    size: 'sm'
+                }
+            },
+            { 
+                label: 'Aggregation',
+                value: metric.aggregation_method,
+                component: Badge,
+                props: { 
+                    label: 'Aggregation',
+                    value: metric.aggregation_method,
+                    variant: 'default',
+                    size: 'sm'
+                }
+            }
         ];
         
         if (metric.min_sample_size) {
-            tags.push({ label: 'Min Sample', value: metric.min_sample_size.toLocaleString() });
+            tags.push({ 
+                label: 'Min Sample',
+                value: metric.min_sample_size.toLocaleString(),
+                component: Badge,
+                props: { 
+                    label: 'Min Sample',
+                    value: metric.min_sample_size.toLocaleString(),
+                    variant: 'default',
+                    size: 'sm'
+                }
+            });
         }
         
         if (metric.min_effect_size) {
-            tags.push({ label: 'Min Effect', value: `${(metric.min_effect_size * 100).toFixed(1)}%` });
+            tags.push({ 
+                label: 'Min Effect',
+                value: `${(metric.min_effect_size * 100).toFixed(1)}%`,
+                component: Badge,
+                props: { 
+                    label: 'Min Effect',
+                    value: `${(metric.min_effect_size * 100).toFixed(1)}%`,
+                    variant: 'default',
+                    size: 'sm'
+                }
+            });
         }
         
         return tags;

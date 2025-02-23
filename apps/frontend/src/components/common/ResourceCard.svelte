@@ -1,13 +1,16 @@
 <script lang="ts">
     import { createEventDispatcher } from 'svelte';
+    import Button from './Button.svelte';
 
     export let title: string;
     export let description: string | undefined = undefined;
-    export let tags: {
+    export let tags: Array<{
         label: string;
         value: string | number;
         className?: string;
-    }[] = [];
+        component?: any;
+        props?: Record<string, any>;
+    }> = [];
     export let showActions = true;
     export let href: string | undefined = undefined;
 
@@ -36,27 +39,34 @@
             {#if tags.length > 0}
                 <div class="mt-2 flex flex-wrap gap-2">
                     {#each tags as tag}
-                        <span class="inline-block px-2 py-1 text-sm rounded {tag.className || 'bg-gray-100'}">
-                            {tag.label}: {tag.value}
-                        </span>
+                        {#if tag.component}
+                            <svelte:component this={tag.component} {...tag.props} />
+                        {:else}
+                            <span class="inline-block px-2 py-1 text-sm rounded {tag.className || 'bg-gray-100'}">
+                                {tag.label}: {tag.value}
+                            </span>
+                        {/if}
                     {/each}
                 </div>
             {/if}
         </div>
         {#if showActions}
             <div class="flex-shrink-0 ml-4 space-x-2">
-                <button
+                <Button
+                    variant="outline"
+                    size="sm"
                     on:click={() => dispatch('edit')}
-                    class="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded"
                 >
                     Edit
-                </button>
-                <button
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    class="!text-red-600 !border-red-600 hover:!bg-red-50"
                     on:click={() => dispatch('delete')}
-                    class="px-3 py-1 text-red-600 hover:bg-red-50 rounded"
                 >
                     Delete
-                </button>
+                </Button>
             </div>
         {/if}
     </div>

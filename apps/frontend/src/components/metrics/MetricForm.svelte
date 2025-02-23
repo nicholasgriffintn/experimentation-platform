@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { MetricDefinition } from '../../types/api';
     import { createEventDispatcher } from 'svelte';
+    import Button from '../common/Button.svelte';
 
     export let metric: Partial<MetricDefinition> = {};
     export let submitLabel = 'Save Metric';
@@ -121,23 +122,23 @@
     </div>
 
     <div class="flex justify-end space-x-3">
-        <button
-            type="button"
+        <Button
+            variant="secondary"
             on:click={() => dispatch('cancel')}
             disabled={loading}
-            class="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+            type="button"
         >
             Cancel
-        </button>
-        <button
+        </Button>
+        <Button
+            variant="primary"
             type="submit"
             disabled={loading}
-            class="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
         >
             {#if loading}
                 <span class="inline-block animate-spin mr-2">⌛</span>
             {/if}
             {submitLabel}
-        </button>
+        </Button>
     </div>
 </form> 

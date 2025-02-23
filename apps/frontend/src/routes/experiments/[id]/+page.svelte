@@ -3,6 +3,9 @@
 	import type { PageData } from './$types';
 	import { experimentResults, loading, error, experimentActions } from '$lib/stores/experiments';
 	import type { Experiment, ExperimentSchedule } from '../../../types/api';
+	import Button from '../../../components/common/Button.svelte';
+	import CardLink from '../../../components/common/CardLink.svelte';
+	import StatusBadge from '../../../components/common/StatusBadge.svelte';
 
 	export let data: PageData;
 	$: experiment = data.experiment as Experiment;
@@ -113,31 +116,29 @@
 					{/if}
 				</div>
 				<div class="flex items-center space-x-4">
-					<span class="px-3 py-1 text-sm rounded-full {getStatusClasses(status)}">
-						{status}
-					</span>
+					<StatusBadge status={status} size="md" />
 					{#if status === 'running'}
 						<div class="flex space-x-2">
-							<button
+							<Button
+								variant="outline"
 								on:click={() => handlePauseExperiment(experiment.id)}
-								class="px-4 py-2 text-yellow-600 border border-yellow-600 rounded-md hover:bg-yellow-50"
 							>
 								Pause
-							</button>
-							<button
+							</Button>
+							<Button
+								variant="danger"
 								on:click={() => handleStopExperiment(experiment.id)}
-								class="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700"
 							>
 								Stop
-							</button>
+							</Button>
 						</div>
 					{:else if status === 'paused'}
-						<button
+						<Button
+							variant="primary"
 							on:click={() => handleResumeExperiment(experiment.id)}
-							class="px-4 py-2 text-white bg-green-600 rounded-md hover:bg-green-700"
 						>
 							Resume
-						</button>
+						</Button>
 					{/if}
 				</div>
 			</div>
@@ -176,12 +177,13 @@
 						<div class="bg-white p-6 rounded-lg shadow">
 							<div class="flex justify-between items-center mb-4">
 								<h2 class="text-xl font-semibold">Schedule</h2>
-								<button
+								<Button
+									variant="outline"
+									size="sm"
 									on:click={() => handleScheduleUpdate(experiment.id)}
-									class="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded"
 								>
 									Edit Schedule
-								</button>
+								</Button>
 							</div>
 							<div class="grid gap-4">
 								{#if experiment.schedule.start_time}
@@ -222,12 +224,13 @@
 						<div class="bg-white p-6 rounded-lg shadow">
 							<div class="flex justify-between items-center mb-4">
 								<h2 class="text-xl font-semibold">Schedule</h2>
-								<button
+								<Button
+									variant="outline"
+									size="sm"
 									on:click={() => handleScheduleUpdate(experiment.id)}
-									class="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded"
 								>
 									Add Schedule
-								</button>
+								</Button>
 							</div>
 							<p class="text-gray-600">No schedule configured</p>
 						</div>
@@ -241,14 +244,9 @@
 									<h3 class="text-lg font-medium mb-3">Primary Metrics</h3>
 									<div class="space-y-3">
 										{#each experiment.metrics as metric}
-											<a href="/metrics/{metric}" class="block p-4 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors">
-												<div class="flex items-center justify-between">
-													<span class="font-medium">{metric}</span>
-													<svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-													</svg>
-												</div>
-											</a>
+											<CardLink href="/metrics/{metric}">
+												<span class="font-medium">{metric}</span>
+											</CardLink>
 										{/each}
 									</div>
 								</div>
@@ -258,19 +256,12 @@
 										<h3 class="text-lg font-medium mb-3">Guardrail Metrics</h3>
 										<div class="space-y-3">
 											{#each experiment.guardrail_metrics as guardrail}
-												<a href="/metrics/{guardrail.metric_name}" class="block p-4 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors">
-													<div class="flex items-center justify-between">
-														<div class="flex items-center space-x-2">
-															<span class="font-medium">{guardrail.metric_name}</span>
-															<span class="text-gray-600">
-																Must be {guardrail.operator} {guardrail.threshold}
-															</span>
-														</div>
-														<svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-															<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-														</svg>
-													</div>
-												</a>
+												<CardLink href="/metrics/{guardrail.metric_name}">
+													<span class="font-medium">{guardrail.metric_name}</span>
+													<span class="text-gray-600">
+														Must be {guardrail.operator} {guardrail.threshold}
+													</span>
+												</CardLink>
 											{/each}
 										</div>
 									</div>

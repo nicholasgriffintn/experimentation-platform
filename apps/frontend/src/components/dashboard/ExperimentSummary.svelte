@@ -1,5 +1,7 @@
 <script lang="ts">
     import type { Experiment } from '../../types/api';
+    import TextLink from '../common/TextLink.svelte';
+    import StatusBadge from '../common/StatusBadge.svelte';
 
     export let experiment: Experiment;
 
@@ -21,14 +23,12 @@
     <div class="flex justify-between items-start">
         <div>
             <h3 class="font-medium">
-                <a class="text-blue-600 hover:text-blue-800" href="/experiments/{experiment.id}">
+                <TextLink href="/experiments/{experiment.id}">
                     {experiment.name}
-                </a>
+                </TextLink>
             </h3>
             <p class="text-sm text-gray-600">{experiment.description}</p>
         </div>
-        <span class="px-2 py-1 text-sm rounded-full {getStatusClasses(experiment.status)}">
-            {experiment.status}
-        </span>
+        <StatusBadge status={experiment.status} size="sm" />
     </div>
 </div> 
