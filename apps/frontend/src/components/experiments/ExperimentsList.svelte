@@ -56,6 +56,20 @@
             });
         }
 
+        if (experiment.variants?.length) {
+            tags.push({ 
+                label: 'Variants',
+                value: experiment.variants.length,
+                component: Badge,
+                props: { 
+                    label: 'Variants',
+                    value: experiment.variants.length,
+                    variant: 'default',
+                    size: 'sm'
+                }
+            });
+        }
+
         return tags;
     }
 </script>
@@ -82,37 +96,6 @@
                         <strong>Hypothesis:</strong> {experiment.hypothesis}
                     </p>
                 {/if}
-
-                <div class="mt-4">
-                    <h4 class="font-medium mb-2">Metrics</h4>
-                    <div class="space-y-2">
-                        {#if experiment.metrics?.length}
-                            <div>
-                                <h5 class="text-sm text-gray-500 mb-1">Primary</h5>
-                                <ul class="space-y-1">
-                                    {#each experiment.metrics || [] as metric}
-                                        <li class="text-sm text-gray-600">{metric}</li>
-                                    {/each}
-                                </ul>
-                            </div>
-
-                            {#if experiment.guardrail_metrics?.length}
-                                <div class="mt-2">
-                                    <h5 class="text-sm text-gray-500 mb-1">Guardrails</h5>
-                                    <ul class="space-y-1">
-                                        {#each experiment.guardrail_metrics as guardrail}
-                                            <li class="text-sm text-gray-600">
-                                                {guardrail.metric_name} {guardrail.operator} {guardrail.threshold}
-                                            </li>
-                                        {/each}
-                                    </ul>
-                                </div>
-                            {/if}
-                        {:else}
-                            <p class="text-sm text-gray-500">No metrics configured</p>
-                        {/if}
-                    </div>
-                </div>
             </ResourceCard>
         {/each}
     </svelte:fragment>
