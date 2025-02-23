@@ -239,24 +239,38 @@
 							<div class="space-y-2">
 								<div class="mb-6">
 									<h3 class="text-lg font-medium mb-3">Primary Metrics</h3>
-									{#each experiment.metrics as metric}
-										<div class="p-3 bg-gray-50 rounded-md">
-											<span class="font-medium">{metric}</span>
-										</div>
-									{/each}
+									<div class="space-y-3">
+										{#each experiment.metrics as metric}
+											<a href="/metrics/{metric}" class="block p-4 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors">
+												<div class="flex items-center justify-between">
+													<span class="font-medium">{metric}</span>
+													<svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+													</svg>
+												</div>
+											</a>
+										{/each}
+									</div>
 								</div>
 
 								{#if experiment.guardrail_metrics?.length}
 									<div>
 										<h3 class="text-lg font-medium mb-3">Guardrail Metrics</h3>
-										<div class="space-y-2">
+										<div class="space-y-3">
 											{#each experiment.guardrail_metrics as guardrail}
-												<div class="p-3 bg-gray-50 rounded-md flex items-center justify-between">
-													<span class="font-medium">{guardrail.metric_name}</span>
-													<span class="text-gray-600">
-														Must be {guardrail.operator} {guardrail.threshold}
-													</span>
-												</div>
+												<a href="/metrics/{guardrail.metric_name}" class="block p-4 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors">
+													<div class="flex items-center justify-between">
+														<div class="flex items-center space-x-2">
+															<span class="font-medium">{guardrail.metric_name}</span>
+															<span class="text-gray-600">
+																Must be {guardrail.operator} {guardrail.threshold}
+															</span>
+														</div>
+														<svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+															<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+														</svg>
+													</div>
+												</a>
 											{/each}
 										</div>
 									</div>
@@ -269,9 +283,9 @@
 				</div>
 			</div>
 
-			{#if $experimentResults[experiment.id]?.metrics}
-				<div class="bg-white p-6 rounded-lg shadow">
-					<h2 class="text-xl font-semibold mb-6">Results</h2>
+			<div class="bg-white p-6 rounded-lg shadow">
+				<h2 class="text-xl font-semibold mb-6">Results</h2>
+				{#if $experimentResults[experiment.id]?.metrics && Object.keys($experimentResults[experiment.id].metrics).length > 0}
 					<div class="space-y-6">
 						{#each Object.entries($experimentResults[experiment.id].metrics) as [metricName, metricResult]}
 							<div class="border-b pb-6 last:border-b-0">
@@ -324,8 +338,20 @@
 							</div>
 						{/each}
 					</div>
-				</div>
-			{/if}
+				{:else}
+					<div class="bg-gray-50 border border-gray-200 p-6 rounded-lg">
+						<div class="flex items-center space-x-3">
+							<svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+							</svg>
+							<div>
+								<h3 class="text-lg font-medium text-gray-900">No Results Available</h3>
+								<p class="mt-1 text-gray-500">Results will appear here once the experiment has collected enough data.</p>
+							</div>
+						</div>
+					</div>
+				{/if}
+			</div>
 
 			{#if experiment.stopped_reason}
 				<div class="bg-white p-6 rounded-lg shadow">
