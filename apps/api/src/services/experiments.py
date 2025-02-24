@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional, cast
-
+import pandas as pd
+import pyarrow as pa
+        
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -340,14 +342,28 @@ class ExperimentService:
             experiment_id=experiment_id, metric_name=metric_name
         )
 
-        from itertools import groupby
-        from operator import itemgetter
+        if not metric_history:
+            return {}
 
-        grouped_data = {}
-        for variant_id, group in groupby(metric_history, key=itemgetter("variant_id")):
-            grouped_data[variant_id] = [item["metric_value"] for item in group]
+        try:
+            if isinstance(metric_history, pa.ChunkedArray):
+                table = pa.Table.from_arrays([metric_history], names=['data'])
+                df = table.to_pandas()
+            elif isinstance(metric_history, pa.Table):
+                df = metric_history.to_pandas()
+            else:
+                df = pd.DataFrame(metric_history)
 
-        return grouped_data
+            if 'variant_id' not in df.columns or 'metric_value' not in df.columns:
+                return {}
+
+            grouped_data = {}
+            for variant_id, group in df.groupby('variant_id'):
+                grouped_data[variant_id] = group['metric_value'].tolist()
+            return grouped_data
+
+        except Exception:
+            return {}
 
     async def pause_experiment(self, experiment_id: str, reason: Optional[str] = None) -> None:
         """Pause an experiment"""
