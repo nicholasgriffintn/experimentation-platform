@@ -12,8 +12,7 @@ To get started, run the following script:
 sh ./scripts/run.sh
 ```
 
-This will setup the required services and start the API and analysis services.
-
+This will setup the required services in the background. Once that's done, you can follow the instructions in each of the apps to get the platform running.
 
 ## Database Migrations
 
