@@ -10,7 +10,7 @@
 
   const initialUserId = `user_${Math.floor(Math.random() * 10000)}`;
   const initialSessionId = `session_${Math.floor(Math.random() * 10000)}`;
-  const initialProperties = { country: "US", user_type: "registered" };
+  const initialProperties = { country: "GB", user_type: "registered" };
 
   let loading = false;
   let error: string | null = null;
@@ -171,7 +171,7 @@
               on:change={updateUserAttributes}
               class="w-full px-3 py-2 border rounded-md h-24 font-mono"
               placeholder={`{
-  "country": "US",
+  "country": "GB",
   "user_type": "registered"
 }`}
             />
