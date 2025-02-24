@@ -77,7 +77,6 @@
 		<StatsCard
 			title="Available Metrics"
 			value={$metrics.length}
-			valueColor="text-blue-600"
 		/>
 	</div>
 
