@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Experimentation Platform Demo</title>
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="css/common.css" />
+  </head>
+  <body class="bg-gray-100 min-h-screen">
+    <nav class="nav-header">
+      <div class="nav-container">
+        <div class="flex">
+          <div class="flex-shrink-0 flex items-center">
+            <a href="index.html" class="nav-brand">ExP Platform</a>
+          </div>
+
+          <div class="nav-links">
+            <a href="index.html" class="nav-link active">Home</a>
+            <a href="demo.html" class="nav-link">Demo App</a>
+            <a href="simulator.html" class="nav-link">Traffic Simulator</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-12">
+      <header class="mb-12 text-center">
+        <h1 class="text-4xl font-bold text-gray-800 mb-4">
+          Experimentation Platform Demo
+        </h1>
+        <p class="text-xl text-gray-600">
+          Interactive demonstrations for working with the Experimentation API
+        </p>
+      </header>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+        <div
+          class="bg-white rounded-lg shadow-lg overflow-hidden transition-transform transform hover:scale-105"
+        >
+          <div class="h-48 bg-blue-600 flex items-center justify-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-24 w-24 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
+          </div>
+          <div class="p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">
+              Demo Application
+            </h2>
+            <p class="text-gray-600 mb-4">
+              Interactive UI for testing variant assignment, recording
+              exposures, and submitting metrics on a user-by-user basis.
+            </p>
+            <ul class="text-gray-600 mb-6 list-disc pl-5">
+              <li>Test user targeting rules</li>
+              <li>Manually assign variants</li>
+              <li>Record experimental exposures</li>
+              <li>Submit metrics and view results</li>
+            </ul>
+            <a
+              href="demo.html"
+              class="block text-center bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-md font-medium transition"
+            >
+              Launch Demo App
+            </a>
+          </div>
+        </div>
+
+        <div
+          class="bg-white rounded-lg shadow-lg overflow-hidden transition-transform transform hover:scale-105"
+        >
+          <div class="h-48 bg-purple-600 flex items-center justify-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-24 w-24 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+              />
+            </svg>
+          </div>
+          <div class="p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">
+              Traffic Simulator
+            </h2>
+            <p class="text-gray-600 mb-4">
+              Generate realistic user traffic to automatically populate
+              experiments with data and build up experiment results.
+            </p>
+            <ul class="text-gray-600 mb-6 list-disc pl-5">
+              <li>Simulate hundreds of users</li>
+              <li>Generate realistic variant assignments</li>
+              <li>Record exposures automatically</li>
+              <li>Create statistically significant results</li>
+            </ul>
+            <a
+              href="simulator.html"
+              class="block text-center bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-md font-medium transition"
+            >
+              Launch Traffic Simulator
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-16 max-w-5xl mx-auto">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">API Overview</h2>
+
+        <div class="bg-white p-6 rounded-lg shadow-md">
+          <p class="text-gray-600 mb-4">
+            This demonstration showcases the Experimentation Platform API, which
+            allows developers to implement A/B tests, multivariate tests, and
+            feature flags in their applications.
+          </p>
+
+          <h3 class="text-xl font-semibold mb-2">Core Concepts</h3>
+
+          <div class="overflow-x-auto">
+            <table class="min-w-full bg-white">
+              <thead>
+                <tr>
+                  <th class="py-2 px-4 border-b text-left">Concept</th>
+                  <th class="py-2 px-4 border-b text-left">Description</th>
+                  <th class="py-2 px-4 border-b text-left">API Endpoints</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="py-2 px-4 border-b font-medium">Experiments</td>
+                  <td class="py-2 px-4 border-b">
+                    Tests that compare different variants to measure their
+                    performance against metrics
+                  </td>
+                  <td class="py-2 px-4 border-b">
+                    <code class="bg-gray-100 px-1 py-0.5 rounded"
+                      >GET /api/v1/experiments</code
+                    ><br />
+                    <code class="bg-gray-100 px-1 py-0.5 rounded"
+                      >POST /api/v1/experiments</code
+                    >
+                  </td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-4 border-b font-medium">Assignments</td>
+                  <td class="py-2 px-4 border-b">
+                    Assignments of variants to users
+                  </td>
+                  <td class="py-2 px-4 border-b">
+                    <code class="bg-gray-100 px-1 py-0.5 rounded"
+                      >POST /api/v1/experiments/{id}/assign</code
+                    >
+                  </td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-4 border-b font-medium">Exposures</td>
+                  <td class="py-2 px-4 border-b">
+                    Records when a user views or interacts with an experimental
+                    variant
+                  </td>
+                  <td class="py-2 px-4 border-b">
+                    <code class="bg-gray-100 px-1 py-0.5 rounded"
+                      >POST /api/v1/experiments/{id}/exposure</code
+                    >
+                  </td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-4 border-b font-medium">Metrics</td>
+                  <td class="py-2 px-4 border-b">
+                    Measurable values that determine experiment success
+                  </td>
+                  <td class="py-2 px-4 border-b">
+                    <code class="bg-gray-100 px-1 py-0.5 rounded"
+                      >POST /api/v1/experiments/{id}/metric</code
+                    ><br />
+                    <code class="bg-gray-100 px-1 py-0.5 rounded"
+                      >GET /api/v1/metrics</code
+                    >
+                  </td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-4 border-b font-medium">Results</td>
+                  <td class="py-2 px-4 border-b">
+                    Statistical analysis of how variants perform
+                  </td>
+                  <td class="py-2 px-4 border-b">
+                    <code class="bg-gray-100 px-1 py-0.5 rounded"
+                      >GET /api/v1/experiments/{id}/results</code
+                    >
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="text-gray-600 mt-4">
+            Check out the included demo applications to see these concepts in
+            action. The demos use the actual API endpoints and work with the
+            experiments loaded in the database from the seed script.
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
