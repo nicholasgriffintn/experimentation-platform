@@ -136,231 +136,241 @@
     </div>
   {/if}
 
-  <FormLayout 
-    title="User Context"
-    description="Configure the user context for experiment assignment"
-  >
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <label class="block text-gray-700 mb-2" for="userId">User ID</label>
-        <input
-          type="text"
-          id="userId"
-          bind:value={userContext.user_id}
-          class="w-full px-3 py-2 border rounded-md"
-          placeholder="user123"
-        />
-      </div>
-      <div>
-        <label class="block text-gray-700 mb-2" for="sessionId">Session ID (optional)</label>
-        <input
-          type="text"
-          id="sessionId"
-          bind:value={userContext.session_id}
-          class="w-full px-3 py-2 border rounded-md"
-          placeholder="session456"
-        />
-      </div>
-    </div>
-    <div class="mt-4">
-      <label for="userAttributes" class="block text-gray-700 mb-2">User Attributes (JSON)</label>
-      <textarea
-        id="userAttributes"
-        bind:value={userAttributesJson}
-        on:change={updateUserAttributes}
-        class="w-full px-3 py-2 border rounded-md h-24 font-mono"
-        placeholder={`{
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div>
+      <FormLayout 
+        title="User Context"
+        description="Configure the user context for experiment assignment"
+      >
+        <div class="grid grid-cols-1 gap-4">
+          <div>
+            <label class="block text-gray-700 mb-2" for="userId">User ID</label>
+            <input
+              type="text"
+              id="userId"
+              bind:value={userContext.user_id}
+              class="w-full px-3 py-2 border rounded-md"
+              placeholder="user123"
+            />
+          </div>
+          <div>
+            <label class="block text-gray-700 mb-2" for="sessionId">Session ID (optional)</label>
+            <input
+              type="text"
+              id="sessionId"
+              bind:value={userContext.session_id}
+              class="w-full px-3 py-2 border rounded-md"
+              placeholder="session456"
+            />
+          </div>
+          <div>
+            <label for="userAttributes" class="block text-gray-700 mb-2">User Attributes (JSON)</label>
+            <textarea
+              id="userAttributes"
+              bind:value={userAttributesJson}
+              on:change={updateUserAttributes}
+              class="w-full px-3 py-2 border rounded-md h-24 font-mono"
+              placeholder={`{
   "country": "US",
   "user_type": "registered"
 }`}
-      />
+            />
+          </div>
+          <div class="text-sm text-gray-500">
+            Note: Some experiments may have targeting rules based on these attributes
+          </div>
+        </div>
+      </FormLayout>
     </div>
-    <div class="mt-2 text-sm text-gray-500">
-      Note: Some experiments may have targeting rules based on these attributes
-    </div>
-  </FormLayout>
 
-  <FormLayout 
-    title="Available Experiments" 
-    description="Select an experiment to test with"
-  >
-    <div class="overflow-x-auto">
-      <table class="min-w-full bg-white">
-        <thead>
-          <tr>
-            <th class="py-2 px-4 border-b text-left">Name</th>
-            <th class="py-2 px-4 border-b text-left">Type</th>
-            <th class="py-2 px-4 border-b text-left">Status</th>
-            <th class="py-2 px-4 border-b text-left">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each experiments as exp}
-            <tr class:bg-blue-50={selectedExperiment?.id === exp.id}>
-              <td class="py-2 px-4 border-b">{exp.name}</td>
-              <td class="py-2 px-4 border-b">{exp.type}</td>
-              <td class="py-2 px-4 border-b">
-                <StatusBadge status={exp.status} />
-              </td>
-              <td class="py-2 px-4 border-b">
-                <Button
-                  on:click={() => selectExperiment(exp)}
-                  disabled={exp.status !== 'running'}
-                  variant={selectedExperiment?.id === exp.id ? 'secondary' : 'primary'}
-                >
-                  Select
-                </Button>
-              </td>
-            </tr>
-          {/each}
-          {#if experiments.length === 0}
-            <tr>
-              <td colspan="4" class="py-4 text-center text-gray-500">
-                No experiments available
-              </td>
-            </tr>
-          {/if}
-        </tbody>
-      </table>
+    <div class="col-span-2">
+      <FormLayout 
+        title="Available Experiments" 
+        description="Select an experiment to test with"
+      >
+        <div class="overflow-x-auto">
+          <table class="min-w-full bg-white border">
+            <thead>
+              <tr>
+                <th class="py-2 px-4 border-b text-left">Name</th>
+                <th class="py-2 px-4 border-b text-left">Type</th>
+                <th class="py-2 px-4 border-b text-left">Status</th>
+                <th class="py-2 px-4 border-b text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each experiments as exp}
+                <tr class:bg-blue-50={selectedExperiment?.id === exp.id}>
+                  <td class="py-2 px-4 border-b">{exp.name}</td>
+                  <td class="py-2 px-4 border-b">{exp.type}</td>
+                  <td class="py-2 px-4 border-b">
+                    <StatusBadge status={exp.status} />
+                  </td>
+                  <td class="py-2 px-4 border-b">
+                    <Button
+                      on:click={() => selectExperiment(exp)}
+                      disabled={exp.status !== 'running'}
+                      variant={selectedExperiment?.id === exp.id ? 'secondary' : 'primary'}
+                    >
+                      Select
+                    </Button>
+                  </td>
+                </tr>
+              {/each}
+              {#if experiments.length === 0}
+                <tr>
+                  <td colspan="4" class="py-4 text-center text-gray-500">
+                    No experiments available
+                  </td>
+                </tr>
+              {/if}
+            </tbody>
+          </table>
+        </div>
+      </FormLayout>
     </div>
-  </FormLayout>
+  </div>
 
   {#if selectedExperiment}
-    <FormLayout 
-      title="Experiment Actions"
-      description="Perform actions on the selected experiment"
-    >
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="bg-gray-50 p-4 rounded-md">
-          <h3 class="font-medium text-lg mb-2">Experiment Details</h3>
-          <div class="space-y-2">
-            <div>
-              <span class="font-medium">ID:</span>
-              <span>{selectedExperiment.id}</span>
+    <div class="mt-6">
+      <FormLayout 
+        title="Experiment Actions"
+        description="Perform actions on the selected experiment"
+      >
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-gray-50 p-4 rounded-md">
+            <h3 class="font-medium text-lg mb-2">Experiment Details</h3>
+            <div class="space-y-2">
+              <div>
+                <span class="font-medium">ID:</span>
+                <span>{selectedExperiment.id}</span>
+              </div>
+              <div>
+                <span class="font-medium">Hypothesis:</span>
+                <span>{selectedExperiment.hypothesis || 'N/A'}</span>
+              </div>
+              <div>
+                <span class="font-medium">Traffic:</span>
+                <span>{selectedExperiment.traffic_allocation}%</span>
+              </div>
+
+              <h4 class="font-medium mt-4 mb-2">Variants:</h4>
+              <ul class="list-disc pl-5">
+                {#each selectedExperiment.variants as variant}
+                  <li>
+                    {variant.name} ({variant.traffic_percentage}%)
+                    {#if variant.type === 'control'}
+                      <span class="text-xs bg-gray-200 px-1 rounded">Control</span>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+
+              <h4 class="font-medium mt-4 mb-2">Metrics:</h4>
+              <ul class="list-disc pl-5">
+                {#each selectedExperiment.metrics as metric}
+                  <li>{metric}</li>
+                {/each}
+              </ul>
             </div>
-            <div>
-              <span class="font-medium">Hypothesis:</span>
-              <span>{selectedExperiment.hypothesis || 'N/A'}</span>
-            </div>
-            <div>
-              <span class="font-medium">Traffic:</span>
-              <span>{selectedExperiment.traffic_allocation}%</span>
+          </div>
+
+          <div class="space-y-4">
+            <div class="p-4 border rounded-md">
+              <h3 class="font-medium mb-2">Assign Variant</h3>
+              <p class="text-sm text-gray-600 mb-2">
+                Assigns this user to a variant based on targeting rules
+              </p>
+              <Button
+                on:click={assignVariant}
+                disabled={!userContext.user_id}
+                variant="primary"
+                fullWidth={true}
+              >
+                Assign Variant
+              </Button>
+
+              {#if assignedVariant}
+                <div class="mt-3 p-3 bg-green-50 rounded-md">
+                  <p class="font-medium">
+                    Assigned to: {assignedVariant.variant_name}
+                  </p>
+                  <p class="text-sm">
+                    Variant ID: {assignedVariant.variant_id}
+                  </p>
+                  <pre class="text-xs bg-gray-100 p-2 mt-2 rounded overflow-x-auto">
+                    <code>{JSON.stringify(assignedVariant.config, null, 2)}</code>
+                  </pre>
+                </div>
+              {/if}
             </div>
 
-            <h4 class="font-medium mt-4 mb-2">Variants:</h4>
-            <ul class="list-disc pl-5">
-              {#each selectedExperiment.variants as variant}
-                <li>
-                  {variant.name} ({variant.traffic_percentage}%)
-                  {#if variant.type === 'control'}
-                    <span class="text-xs bg-gray-200 px-1 rounded">Control</span>
-                  {/if}
-                </li>
-              {/each}
-            </ul>
+            <div class="p-4 border rounded-md">
+              <h3 class="font-medium mb-2">Record Exposure</h3>
+              <p class="text-sm text-gray-600 mb-2">
+                Record that user was exposed to experiment
+              </p>
+              <Button
+                on:click={recordExposure}
+                disabled={!userContext.user_id || !assignedVariant}
+                variant="primary"
+                fullWidth={true}
+              >
+                Record Exposure
+              </Button>
 
-            <h4 class="font-medium mt-4 mb-2">Metrics:</h4>
-            <ul class="list-disc pl-5">
-              {#each selectedExperiment.metrics as metric}
-                <li>{metric}</li>
-              {/each}
-            </ul>
+              {#if exposureRecorded}
+                <div class="mt-3 p-3 bg-green-50 rounded-md">
+                  <p class="font-medium">Exposure recorded successfully!</p>
+                </div>
+              {/if}
+            </div>
           </div>
         </div>
-
-        <div class="flex flex-col space-y-4">
-          <div class="p-4 border rounded-md">
-            <h3 class="font-medium mb-2">Assign Variant</h3>
-            <p class="text-sm text-gray-600 mb-2">
-              Assigns this user to a variant based on targeting rules
-            </p>
-            <Button
-              on:click={assignVariant}
-              disabled={!userContext.user_id}
-              variant="primary"
-              fullWidth={true}
-            >
-              Assign Variant
-            </Button>
-
-            {#if assignedVariant}
-              <div class="mt-3 p-3 bg-green-50 rounded-md">
-                <p class="font-medium">
-                  Assigned to: {assignedVariant.variant_name}
-                </p>
-                <p class="text-sm">
-                  Variant ID: {assignedVariant.variant_id}
-                </p>
-                <pre class="text-xs bg-gray-100 p-2 mt-2 rounded overflow-x-auto">
-                  <code>{JSON.stringify(assignedVariant.config, null, 2)}</code>
-                </pre>
-              </div>
-            {/if}
-          </div>
-
-          <div class="p-4 border rounded-md">
-            <h3 class="font-medium mb-2">Record Exposure</h3>
-            <p class="text-sm text-gray-600 mb-2">
-              Record that user was exposed to experiment
-            </p>
-            <Button
-              on:click={recordExposure}
-              disabled={!userContext.user_id || !assignedVariant}
-              variant="primary"
-              fullWidth={true}
-            >
-              Record Exposure
-            </Button>
-
-            {#if exposureRecorded}
-              <div class="mt-3 p-3 bg-green-50 rounded-md">
-                <p class="font-medium">Exposure recorded successfully!</p>
-              </div>
-            {/if}
-          </div>
-        </div>
-      </div>
-    </FormLayout>
+      </FormLayout>
+    </div>
   {/if}
 
-  <FormLayout 
-    title="API Response Console"
-    description="View recent API interactions"
-  >
-    <div class="flex justify-between items-center mb-4">
-      {#if apiResponses.length > 0}
-        <Button
-          on:click={() => apiResponses = []}
-          variant="danger"
-          size="sm"
-        >
-          Clear
-        </Button>
+  <div class="mt-6">
+    <FormLayout 
+      title="API Response Console"
+      description="View recent API interactions"
+    >
+      <div class="flex justify-between items-center mb-4">
+        {#if apiResponses.length > 0}
+          <Button
+            on:click={() => apiResponses = []}
+            variant="danger"
+            size="sm"
+          >
+            Clear
+          </Button>
+        {/if}
+      </div>
+
+      {#if !apiResponses.length}
+        <div class="text-gray-500">
+          API responses will appear here after interactions.
+        </div>
       {/if}
-    </div>
 
-    {#if !apiResponses.length}
-      <div class="text-gray-500">
-        API responses will appear here after interactions.
-      </div>
-    {/if}
-
-    {#if apiResponses.length > 0}
-      <div class="space-y-3">
-        {#each apiResponses as response}
-          <div class="bg-gray-50 p-3 rounded-md">
-            <div class="flex justify-between text-sm mb-1">
-              <span class:text-green-600={response.success} class:text-red-600={!response.success} class="font-medium">
-                {response.endpoint}
-              </span>
-              <span class="text-gray-500">{response.timestamp}</span>
+      {#if apiResponses.length > 0}
+        <div class="bg-gray-800 text-gray-100 p-3 rounded-md overflow-y-auto h-64 font-mono text-sm">
+          {#each apiResponses as response}
+            <div class="border-b border-gray-700 pb-2 mb-2 last:border-0">
+              <div class="flex justify-between text-sm mb-1">
+                <span class:text-green-400={response.success} class:text-red-400={!response.success} class="font-medium">
+                  {response.endpoint}
+                </span>
+                <span class="text-gray-400">{response.timestamp}</span>
+              </div>
+              <pre class="text-xs overflow-x-auto"><code>{JSON.stringify(response.data, null, 2)}</code></pre>
             </div>
-            <pre class="text-xs bg-gray-800 text-white p-2 rounded overflow-x-auto"><code>{JSON.stringify(response.data, null, 2)}</code></pre>
-          </div>
-        {/each}
-      </div>
-    {/if}
-  </FormLayout>
+          {/each}
+        </div>
+      {/if}
+    </FormLayout>
+  </div>
 </div>
 
 <style>
