@@ -120,7 +120,9 @@
 
 <div class="container mx-auto px-4 py-8">
 	<h1 class="text-3xl font-bold mb-1">Platform Demo</h1>
-  <p class="text-lg text-gray-600 mb-8">Test core platform features</p>
+  <p class="text-lg text-gray-600 mb-8">
+    Try out the core platform without having to setup your own site on this page, please note that this is for testing and not for production.
+  </p>
 
   {#if loading}
     <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

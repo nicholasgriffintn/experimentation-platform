@@ -342,7 +342,9 @@
 
 <div class="container mx-auto px-4 py-8">
 	<h1 class="text-3xl font-bold mb-1">Traffic Simulator</h1>
-  <p class="text-lg text-gray-600 mb-8">Test platform performance with simulated traffic</p>
+  <p class="text-lg text-gray-600 mb-8">
+    The aim of this tool is to quickly add simulated traffic to your experiments, you should only use this for testing and not for production.
+  </p>
 
   {#if loading}
     <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
