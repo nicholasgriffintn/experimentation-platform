@@ -61,6 +61,7 @@
   let elapsedTime = 0;
   let remainingTime = 0;
   let progressPercentage = 0;
+  let updateIntervalId: NodeJS.Timeout | null = null;
 
   interface UserAssignments {
     [userId: string]: {
@@ -172,7 +173,6 @@
   async function startSimulation() {
     if (isRunning) return;
 
-    // Check if there are running experiments
     if (activeExperiments.length === 0) {
       await loadExperiments();
       if (activeExperiments.length === 0) {
@@ -203,7 +203,6 @@
       message: `Starting simulation with ${config.numUsers} users for ${config.durationMinutes} minutes...`
     }, ...logs];
 
-    // Reset experiment stats
     activeExperiments = activeExperiments.map(exp => ({
       ...exp,
       assignments: 0,
@@ -212,14 +211,17 @@
     }));
 
     const endTime = Date.now() + (config.durationMinutes * 60 * 1000);
-    const updateInterval = setInterval(() => {
+    updateIntervalId = setInterval(() => {
       const now = Date.now();
       elapsedTime = now - stats.startTime;
       remainingTime = Math.max(0, endTime - now);
       progressPercentage = (elapsedTime / (config.durationMinutes * 60 * 1000)) * 100;
 
       if (now >= endTime) {
-        clearInterval(updateInterval);
+        if (updateIntervalId) {
+          clearInterval(updateIntervalId);
+          updateIntervalId = null;
+        }
         isRunning = false;
         status = 'completed';
         logs = [{
@@ -230,11 +232,9 @@
       }
     }, 100);
 
-    // Generate user pool
     const userPool = generateUserPool();
     const userAssignments: UserAssignments = {};
 
-    // Run simulation
     try {
       while (isRunning && Date.now() < endTime) {
         for (const user of userPool) {
@@ -244,15 +244,12 @@
             const exp = activeExperiments[Math.floor(Math.random() * activeExperiments.length)];
             if (!exp) continue;
 
-            // Initialize user's assignment tracking if needed
             if (!userAssignments[user.user_id]) {
               userAssignments[user.user_id] = {};
             }
 
-            // Check if user is already assigned to this experiment
             let assignment = userAssignments[user.user_id][exp.id];
 
-            // If not assigned, try to assign
             if (!assignment) {
               assignment = await api.assignVariant(exp.id, user);
               if (assignment) {
@@ -275,17 +272,14 @@
               }
             }
 
-            // Skip if not assigned
             if (!assignment) continue;
 
-            // Record exposure (70% probability)
             if (Math.random() < 0.7) {
               await api.recordExposure(exp.id, user);
               stats = { ...stats, totalExposures: stats.totalExposures + 1 };
               exp.exposures++;
             }
 
-            // Record metrics (50% probability for each metric)
             const metricsToRecord = Object.keys(exp.metrics).filter(() => Math.random() > 0.5);
             for (const metric of metricsToRecord) {
               stats = { ...stats, totalMetrics: stats.totalMetrics + 1 };
@@ -294,10 +288,9 @@
 
             if (metricsToRecord.length > 0) {
               logs[0].details.metrics = metricsToRecord;
-              logs = [...logs]; // Trigger reactivity for the metrics update
+              logs = [...logs];
             }
 
-            // Keep logs manageable
             if (logs.length > 100) {
               logs = logs.slice(0, 100);
             }
@@ -431,6 +424,10 @@
                   on:click={() => {
                     isRunning = false;
                     status = 'completed';
+                    if (updateIntervalId) {
+                      clearInterval(updateIntervalId);
+                      updateIntervalId = null;
+                    }
                     logs = [{
                       timestamp: new Date().toISOString(),
                       type: 'warning',

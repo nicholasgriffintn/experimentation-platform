@@ -41,7 +41,7 @@
       success,
       data,
       timestamp: new Date().toLocaleTimeString()
-    }, ...apiResponses].slice(0, 10); // Keep only last 10 responses
+    }, ...apiResponses].slice(0, 10);
   }
 
   async function loadExperiments() {

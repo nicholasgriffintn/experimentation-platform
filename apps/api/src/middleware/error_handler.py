@@ -52,20 +52,42 @@ async def error_handler(
             f"Application error: {e.message}",
             extra={"status_code": e.status_code, "details": e.details, "path": request.url.path},
         )
+        origin = request.headers.get("origin", "http://localhost:3000")
         return JSONResponse(
-            status_code=e.status_code, content={"error": e.message, "details": e.details}
+            status_code=e.status_code,
+            content={"error": e.message, "details": e.details},
+            headers={
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Credentials": "true"
+            }
         )
 
     except SQLAlchemyError as e:
         logger.error(f"Database error: {str(e)}", extra={"path": request.url.path}, exc_info=True)
+        origin = request.headers.get("origin", "http://localhost:3000")
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"error": "Database error occurred", "details": {"message": str(e)}},
+            headers={
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Credentials": "true"
+            }
         )
 
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}", extra={"path": request.url.path}, exc_info=True)
+        origin = request.headers.get("origin", "http://localhost:3000")
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"error": "An unexpected error occurred", "details": {"message": str(e)}},
+            headers={
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Credentials": "true"
+            }
         )

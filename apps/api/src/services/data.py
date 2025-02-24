@@ -144,20 +144,31 @@ class IcebergDataService:
 
     async def get_experiment_config(self, experiment_id: str) -> Dict:
         """Get experiment configuration from database"""
+        try:
+            experiment_table = self.load_table("experiments.experiments")
+            scanner = experiment_table.scan()
+            
+            if snapshot and hasattr(snapshot, "snapshot_id"):
+                scanner = scanner.use_ref(str(snapshot.snapshot_id))
+            
+            scanner = scanner.filter(EqualTo(Reference("experiment_id"), experiment_id))
+            scanner = scanner.select("id", "type", "variant_id", "context")
+
+            assignments = list(scanner.to_arrow())
+            
+            if not assignments:
+                return {"id": experiment_id, "metrics": {}, "variants": [], "type": None}
+                
+            experiment_type = assignments[0]["type"]
+        except Exception as e:
+            logger.warning(f"Failed to load experiments table: {str(e)}")
+            return {"id": experiment_id, "metrics": {}, "variants": [], "type": "ab_test"}
+
         assignments_table = self.load_table(f"experiments.{experiment_id}_assignments")
 
         snapshot = assignments_table.current_snapshot()
         if not snapshot:
-            return {"id": experiment_id, "metrics": {}, "variants": []}
-
-        scanner = assignments_table.scan()
-        if snapshot and hasattr(snapshot, "snapshot_id"):
-            scanner = scanner.use_ref(str(snapshot.snapshot_id))
-
-        scanner = scanner.filter(EqualTo(Reference("experiment_id"), experiment_id))
-        scanner = scanner.select("variant_id", "context")
-
-        assignments = list(scanner.to_arrow())
+            return {"id": experiment_id, "metrics": {}, "variants": [], "type": experiment_type}
 
         variants = list(
             {
@@ -185,7 +196,7 @@ class IcebergDataService:
         else:
             metrics_config = {}
 
-        return {"id": experiment_id, "metrics": metrics_config, "variants": variants}
+        return {"id": experiment_id, "metrics": metrics_config, "variants": variants, "type": experiment_type}
 
     async def record_event(self, experiment_id: str, event_data: Dict) -> None:
         """Record an event for the experiment"""

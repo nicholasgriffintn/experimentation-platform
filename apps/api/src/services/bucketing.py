@@ -78,7 +78,7 @@ class BucketingService:
         if experiment_type == ExperimentType.FEATURE_FLAG:
             return variants[0] if variants else None
         
-        elif experiment_type == ExperimentType.A_B_TEST:
+        elif experiment_type == ExperimentType.AB_TEST:
             bucket = self._get_user_bucket(user_id, experiment_id)
             
             total_allocation = sum(v.traffic_percentage for v in variants)

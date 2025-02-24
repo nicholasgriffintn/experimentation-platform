@@ -1,5 +1,4 @@
 import { BaseAPI } from './base';
-import { config } from '../config';
 import type {
     Experiment,
     ExperimentCreate,
