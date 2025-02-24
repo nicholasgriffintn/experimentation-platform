@@ -75,28 +75,32 @@ class BucketingService:
         if (inclusion_bucket / self.bucket_count * 100) > traffic_allocation:
             return None
 
-        bucket = self._get_user_bucket(user_id, experiment_id)
+        if experiment_type == ExperimentType.FEATURE_FLAG:
+            return variants[0] if variants else None
+        
+        elif experiment_type == ExperimentType.A_B_TEST:
+            bucket = self._get_user_bucket(user_id, experiment_id)
+            
+            total_allocation = sum(v.traffic_percentage for v in variants)
+            if total_allocation != 100:
+                scale_factor = 100 / total_allocation
+                cumulative = 0
+                for variant in variants:
+                    variant_buckets = int(
+                        (variant.traffic_percentage * scale_factor / 100) * self.bucket_count
+                    )
+                    upper_bound = cumulative + variant_buckets
+                    if bucket < upper_bound:
+                        return variant
+                    cumulative = upper_bound
 
-        total_allocation = sum(v.traffic_percentage for v in variants)
-        if total_allocation != 100:
-            scale_factor = 100 / total_allocation
             cumulative = 0
             for variant in variants:
-                variant_buckets = int(
-                    (variant.traffic_percentage * scale_factor / 100) * self.bucket_count
-                )
+                variant_buckets = int((variant.traffic_percentage / 100) * self.bucket_count)
                 upper_bound = cumulative + variant_buckets
                 if bucket < upper_bound:
                     return variant
                 cumulative = upper_bound
-
-        cumulative = 0
-        for variant in variants:
-            variant_buckets = int((variant.traffic_percentage / 100) * self.bucket_count)
-            upper_bound = cumulative + variant_buckets
-            if bucket < upper_bound:
-                return variant
-            cumulative = upper_bound
 
         return variants[0] if variants else None
 
