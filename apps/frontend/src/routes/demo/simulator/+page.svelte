@@ -119,7 +119,7 @@
     }
   }
 
-  function getRandomWithWeight(weights: Record<string, number>, options: string[]): string {
+  function getRandomFromWeights(options: string[], weights: Record<string, number>): string {
     const r = Math.random();
     let sum = 0;
     for (const option of options) {
@@ -131,18 +131,16 @@
 
   function generateUserPool() {
     const userPool = [];
-    const countries = ['UK', 'US', 'CA', 'DE', 'FR', 'JP', 'AU'];
-    const userTypes = ['new', 'registered', 'premium'];
-    const platforms = ['web', 'mobile', 'tablet'];
+    const { countries, devices, userTypes, trafficSplit } = config.userProperties;
 
     for (let i = 0; i < config.numUsers; i++) {
       userPool.push({
         user_id: `sim_user_${i}_${Date.now()}`,
         session_id: `sim_session_${i}_${Date.now()}`,
         properties: {
-          country: countries[Math.floor(Math.random() * countries.length)],
-          user_type: userTypes[Math.floor(Math.random() * userTypes.length)],
-          platform: platforms[Math.floor(Math.random() * platforms.length)],
+          country: getRandomFromWeights(countries, trafficSplit),
+          user_type: getRandomFromWeights(userTypes, trafficSplit),
+          platform: getRandomFromWeights(devices, trafficSplit),
           visits: Math.floor(Math.random() * 30) + 1,
           signup_days: Math.floor(Math.random() * 365)
         }
@@ -314,11 +312,6 @@
     const minutes = Math.floor(ms / 60000);
     const seconds = Math.floor((ms % 60000) / 1000);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  }
-
-  function getExperimentAssignments(expId: string) {
-    const exp = activeExperiments.find(e => e.id === expId);
-    return exp ? exp.assignments : 0;
   }
 </script>
 
