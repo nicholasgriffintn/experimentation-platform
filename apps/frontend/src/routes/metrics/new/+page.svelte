@@ -15,10 +15,13 @@
     }
 </script>
 
-<FormLayout title="Create New Metric" error={$error}>
-    <MetricForm
-        on:submit={handleSubmit}
-        on:cancel={() => goto('/metrics')}
-        loading={$loading}
-    />
-</FormLayout> 
+<div class="container mx-auto px-4 py-8">
+	<h1 class="text-3xl font-bold mb-8">Create New Metric</h1>
+	<FormLayout error={$error}>
+		<MetricForm
+			on:submit={handleSubmit}
+			on:cancel={() => goto('/metrics')}
+			loading={$loading}
+        />
+    </FormLayout> 
+</div>

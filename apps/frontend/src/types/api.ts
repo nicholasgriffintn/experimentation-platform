@@ -1,5 +1,6 @@
 export interface UserContext {
     user_id: string;
+    session_id?: string;
     properties?: Record<string, any>;
 }
 

@@ -1,12 +1,18 @@
 <script lang="ts">
-    export let title: string;
+    export let title: string = "";
+    export let description: string = "";
     export let error: string | null = null;
 </script>
 
-<div class="container mx-auto px-4 py-8">
-    <div class="flex justify-between items-center mb-8">
-        <h1 class="text-3xl font-bold">{title}</h1>
-    </div>
+<div class="form-container">
+    {#if title}
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold">{title}</h2>
+            {#if description}
+                <p class="text-lg text-gray-600">{description}</p>
+            {/if}
+        </div>
+    {/if}
 
     {#if error}
         <div class="p-4 mb-6 text-red-700 bg-red-100 rounded-md">

@@ -11,7 +11,7 @@
         component?: any;
         props?: Record<string, any>;
     }> = [];
-    export let showActions = true;
+    export let showActions = false;
     export let href: string | undefined = undefined;
 
     const dispatch = createEventDispatcher<{
