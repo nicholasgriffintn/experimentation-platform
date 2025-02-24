@@ -122,5 +122,5 @@ class ExperimentResults(BaseModel):
     start_time: datetime
     end_time: Optional[datetime]
     total_users: int
-    metrics: Dict[str, Dict[str, MetricResult]]  # metric_name -> variant_id -> result
+    metrics: Dict[str, Dict[str, MetricResult]]
     guardrail_violations: Optional[List[Dict[str, Any]]] = None

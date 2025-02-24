@@ -71,17 +71,21 @@ class BucketingService:
         Optional[VariantConfig]
             The assigned variant, or None if user is not included in experiment
         """
+        if not variants:
+            return None
+
         inclusion_bucket = self._get_user_bucket(user_id, f"{experiment_id}:inclusion")
         if (inclusion_bucket / self.bucket_count * 100) > traffic_allocation:
             return None
 
         if experiment_type == ExperimentType.FEATURE_FLAG:
             return variants[0] if variants else None
-        
+
         elif experiment_type == ExperimentType.AB_TEST:
             bucket = self._get_user_bucket(user_id, experiment_id)
-            
+
             total_allocation = sum(v.traffic_percentage for v in variants)
+
             if total_allocation != 100:
                 scale_factor = 100 / total_allocation
                 cumulative = 0

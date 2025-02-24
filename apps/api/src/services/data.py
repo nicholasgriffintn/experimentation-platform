@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
 
+import pyarrow as pa
 from pyiceberg.catalog import Catalog
 from pyiceberg.expressions import (
     And,
@@ -14,7 +15,9 @@ from pyiceberg.partitioning import PartitionField, PartitionSpec
 from pyiceberg.schema import Schema
 from pyiceberg.table import Table
 from pyiceberg.transforms import DayTransform, IdentityTransform, MonthTransform
+from sqlalchemy.orm import Session, joinedload
 
+from ..db.base import Experiment as DBExperiment
 from ..schema.iceberg_schema import IcebergSchemas
 from ..utils.logger import logger
 
@@ -142,61 +145,45 @@ class IcebergDataService:
                 logger.error(f"Failed to create table {table_name}: {error_msg}")
             return False
 
-    async def get_experiment_config(self, experiment_id: str) -> Dict:
+    async def get_experiment_config(self, experiment_id: str, db: Session) -> Dict:
         """Get experiment configuration from database"""
-        try:
-            experiment_table = self.load_table("experiments.experiments")
-            scanner = experiment_table.scan()
-            
-            if snapshot and hasattr(snapshot, "snapshot_id"):
-                scanner = scanner.use_ref(str(snapshot.snapshot_id))
-            
-            scanner = scanner.filter(EqualTo(Reference("experiment_id"), experiment_id))
-            scanner = scanner.select("id", "type", "variant_id", "context")
-
-            assignments = list(scanner.to_arrow())
-            
-            if not assignments:
-                return {"id": experiment_id, "metrics": {}, "variants": [], "type": None}
-                
-            experiment_type = assignments[0]["type"]
-        except Exception as e:
-            logger.warning(f"Failed to load experiments table: {str(e)}")
-            return {"id": experiment_id, "metrics": {}, "variants": [], "type": "ab_test"}
-
-        assignments_table = self.load_table(f"experiments.{experiment_id}_assignments")
-
-        snapshot = assignments_table.current_snapshot()
-        if not snapshot:
-            return {"id": experiment_id, "metrics": {}, "variants": [], "type": experiment_type}
-
-        variants = list(
-            {
-                assignment["variant_id"]: {
-                    "id": assignment["variant_id"],
-                    "context": assignment["context"],
-                }
-                for assignment in assignments
-            }.values()
+        experiment = (
+            db.query(DBExperiment)
+            .options(
+                joinedload(DBExperiment.variants),
+                joinedload(DBExperiment.metrics),
+                joinedload(DBExperiment.guardrail_metrics),
+            )
+            .filter(DBExperiment.id == experiment_id)
+            .first()
         )
 
-        metrics_table = self.load_table(f"experiments.{experiment_id}_metrics")
-        metrics_snapshot = metrics_table.current_snapshot()
+        if not experiment:
+            return {"id": experiment_id, "metrics": {}, "variants": [], "type": None}
 
-        if metrics_snapshot and hasattr(metrics_snapshot, "snapshot_id"):
-            metrics_scanner = metrics_table.scan()
-            metrics_scanner = metrics_scanner.use_ref(str(metrics_snapshot.snapshot_id))
-            metrics_scanner = metrics_scanner.filter(
-                EqualTo(Reference("experiment_id"), experiment_id)
-            )
-            metrics_scanner = metrics_scanner.select("metric_name", "metadata")
+        variants = [
+            {
+                "id": variant.id,
+                "name": variant.name,
+                "config": variant.config,
+                "traffic_percentage": variant.traffic_percentage,
+            }
+            for variant in experiment.variants
+        ]
 
-            metrics = list(metrics_scanner.to_arrow())
-            metrics_config = {metric["metric_name"]: metric["metadata"] for metric in metrics}
-        else:
-            metrics_config = {}
+        metrics_config = {}
+        for metric in experiment.metrics:
+            metrics_config[metric.metric_name] = {
+                "min_sample_size": experiment.default_metric_config.get("min_sample_size", 100),
+                "min_effect_size": experiment.default_metric_config.get("min_effect_size", 0.01),
+            }
 
-        return {"id": experiment_id, "metrics": metrics_config, "variants": variants, "type": experiment_type}
+        return {
+            "id": experiment_id,
+            "metrics": metrics_config,
+            "variants": variants,
+            "type": experiment.type,
+        }
 
     async def record_event(self, experiment_id: str, event_data: Dict) -> None:
         """Record an event for the experiment"""
@@ -237,15 +224,44 @@ class IcebergDataService:
         """Record a user-variant assignment"""
         table = self.load_table(f"experiments.{experiment_id}_assignments")
 
+        context_map = {}
+        if context:
+            for key, value in context.items():
+                if isinstance(value, dict):
+                    for subkey, subvalue in value.items():
+                        flat_key = f"{key}.{subkey}"
+                        context_map[flat_key] = str(subvalue) if subvalue is not None else ""
+                else:
+                    context_map[str(key)] = str(value) if value is not None else ""
+
         data = {
-            "assignment_id": str(uuid.uuid4()),
-            "experiment_id": experiment_id,
-            "user_id": user_id,
-            "variant_id": variant_id,
-            "timestamp": datetime.utcnow(),
-            "context": context or {},
+            "assignment_id": [str(uuid.uuid4())],
+            "experiment_id": [experiment_id],
+            "user_id": [user_id],
+            "variant_id": [variant_id],
+            "timestamp": [datetime.utcnow()],
+            "context": [context_map if context_map else {}],
         }
-        table.append([data])
+
+        try:
+            key_type = pa.string()
+            value_type = pa.string()
+            map_type = pa.map_(key_type, value_type, keys_sorted=True)
+            pa_schema = pa.schema(
+                [
+                    ("assignment_id", pa.string(), False),
+                    ("experiment_id", pa.string(), False),
+                    ("user_id", pa.string(), False),
+                    ("variant_id", pa.string(), False),
+                    ("timestamp", pa.timestamp("us"), False),
+                    ("context", map_type, True),
+                ]
+            )
+            pa_table = pa.Table.from_pydict(data, schema=pa_schema)
+            table.append(pa_table)
+        except Exception as e:
+            print(f"Data: {data}")
+            raise e
 
     async def record_results(self, experiment_id: str, results_data: Dict) -> None:
         """Record analysis results"""

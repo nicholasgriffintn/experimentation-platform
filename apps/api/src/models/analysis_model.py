@@ -57,5 +57,5 @@ class MetricResult(BaseModel):
 
 class AnalysisResults(BaseModel):
     experiment_id: str
-    metrics: Dict[str, Dict[str, MetricResult]]  # metric_name -> variant_id -> result
+    metrics: Dict[str, Dict[str, MetricResult]]
     guardrail_violations: Optional[Dict[str, Any]] = None

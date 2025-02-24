@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from ..models.analysis_model import AnalysisMethod, CorrectionMethod
 from ..models.enums import VariantType
@@ -41,15 +42,17 @@ class ExperimentService:
         analysis_service: CombinedAnalysisService,
         bucketing_service: Optional[BucketingService] = None,
         cache_service: Optional[Any] = None,
+        db: Optional[Session] = None,
     ):
         self.data_service = data_service
         self.analysis_service = analysis_service
         self.bucketing_service = bucketing_service or BucketingService()
         self.cache_service = cache_service
+        self.db = db
 
     async def _get_user_variant(
         self, experiment_id: str, user_context: Dict
-    ) -> Optional[VariantConfig]:
+    ) -> Optional[Dict[str, Any]]:
         """Get the variant assigned to a user"""
         user_id = user_context.get("user_id")
         if not user_id:
@@ -60,23 +63,26 @@ class ExperimentService:
                 experiment_id, user_id
             )
             if cached_assignment:
-                return VariantConfig(**cached_assignment)
+                return cached_assignment
 
         config = await self._get_experiment_config(experiment_id)
         for variant in config.get("variants", []):
             if variant.get("id") == user_id:
-                return VariantConfig(**variant)
+                return variant
 
         return None
 
     async def _get_experiment_config(self, experiment_id: str) -> Dict[str, Any]:
         """Get experiment configuration from cache or database"""
+        if not self.db:
+            raise ValueError("Database session is required")
+
         if self.cache_service:
             config = await self.cache_service.get_experiment_config(experiment_id)
             if config:
                 return cast(Dict[str, Any], config)
 
-        return await self.data_service.get_experiment_config(experiment_id)
+        return await self.data_service.get_experiment_config(experiment_id, self.db)
 
     async def initialize_experiment(self, experiment_id: str, config: Dict) -> bool:
         """Initialize a new experiment with required infrastructure
@@ -132,16 +138,18 @@ class ExperimentService:
             await self.data_service.assign_variant(
                 experiment_id=experiment_id,
                 user_id=user_id,
-                variant_id=variant.id,
+                variant_id=variant["id"],
                 context=user_context,
             )
 
             if self.cache_service:
                 await self.cache_service.set_variant_assignment(
-                    experiment_id=experiment_id, user_id=user_id, assignment=variant.dict()
+                    experiment_id=experiment_id,
+                    user_id=user_id,
+                    assignment=variant,
                 )
 
-        return variant.dict() if variant else None
+        return variant if variant else None
 
     def _meets_targeting_rules(self, user_context: Dict, targeting_rules: Dict) -> bool:
         """Check if user meets targeting rules"""
@@ -183,7 +191,7 @@ class ExperimentService:
             metric_data={
                 "metric_name": metric_name,
                 "metric_value": value,
-                "variant_id": variant.id,
+                "variant_id": variant["id"],
                 "user_id": user_context.get("user_id"),
                 "metadata": metadata or {},
             },
@@ -195,7 +203,19 @@ class ExperimentService:
         """Analyze current experiment results with multiple testing correction"""
         logger.info(f"Analyzing results for experiment {experiment_id}")
         config = await self._get_experiment_config(experiment_id)
-        metrics_to_analyze = metrics or [m.name for m in config["metrics"]]
+        
+        if metrics:
+            metrics_to_analyze = metrics
+        else:
+            metrics_to_analyze = []
+            config_metrics = config.get("metrics", {})
+            for metric in config_metrics:
+                if isinstance(metric, dict):
+                    metrics_to_analyze.append(metric.get("name"))
+                elif isinstance(metric, str):
+                    metrics_to_analyze.append(metric)
+                else:
+                    metrics_to_analyze.append(metric.name)
 
         if not metrics_to_analyze:
             return {

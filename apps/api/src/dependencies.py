@@ -73,7 +73,10 @@ def get_experiment_service(
 ) -> ExperimentService:
     """Get ExperimentService instance with all dependencies."""
     return ExperimentService(
-        data_service=data_service, analysis_service=analysis_service, cache_service=cache_service
+        data_service=data_service,
+        analysis_service=analysis_service,
+        cache_service=cache_service,
+        db=db,
     )
 
 

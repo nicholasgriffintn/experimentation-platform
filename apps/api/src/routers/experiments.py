@@ -158,7 +158,7 @@ async def assign_variant(
     if not variant:
         raise ValidationError(
             "User does not meet targeting criteria",
-            details={"experiment_id": experiment_id, "user_context": user_context},
+            details={"experiment_id": experiment_id, "user_context": user_context.dict()},
         )
 
     return VariantAssignment(

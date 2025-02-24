@@ -60,8 +60,8 @@ async def error_handler(
                 "Access-Control-Allow-Origin": origin,
                 "Access-Control-Allow-Methods": "*",
                 "Access-Control-Allow-Headers": "*",
-                "Access-Control-Allow-Credentials": "true"
-            }
+                "Access-Control-Allow-Credentials": "true",
+            },
         )
 
     except SQLAlchemyError as e:
@@ -74,8 +74,8 @@ async def error_handler(
                 "Access-Control-Allow-Origin": origin,
                 "Access-Control-Allow-Methods": "*",
                 "Access-Control-Allow-Headers": "*",
-                "Access-Control-Allow-Credentials": "true"
-            }
+                "Access-Control-Allow-Credentials": "true",
+            },
         )
 
     except Exception as e:
@@ -88,6 +88,6 @@ async def error_handler(
                 "Access-Control-Allow-Origin": origin,
                 "Access-Control-Allow-Methods": "*",
                 "Access-Control-Allow-Headers": "*",
-                "Access-Control-Allow-Credentials": "true"
-            }
+                "Access-Control-Allow-Credentials": "true",
+            },
         )
