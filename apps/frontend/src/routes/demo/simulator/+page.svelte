@@ -419,11 +419,6 @@
               </div>
             {/if}
           </div>
-
-          <div class="flex items-center justify-between pt-2">
-            <span class="font-medium">Status:</span>
-            <span>{status}</span>
-          </div>
         </div>
       </FormLayout>
     </div>
@@ -433,6 +428,10 @@
         title="Simulation Statistics"
         description="Real-time metrics and experiment performance"
       >
+        <div class="flex items-center justify-between pt-2 mb-4">
+          <span class="font-medium">Status:</span>
+          <span>{status}</span>
+        </div>
         {#if !stats.startTime}
           <div class="text-gray-500">
             Simulation has not started yet. Statistics will appear here.

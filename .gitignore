@@ -4,6 +4,7 @@ node_modules/
 __pycache__
 .DS_Store
 *.log
+*.log.*
 .ruff_cache
 .mypy_cache
 .pytest_cache
