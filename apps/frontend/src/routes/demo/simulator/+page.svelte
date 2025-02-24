@@ -17,7 +17,7 @@
     durationMinutes: 5,
     requestIntervalMs: 1000,
     userProperties: {
-      countries: ['US', 'UK', 'CA', 'AU', 'DE', 'FR', 'JP'],
+      countries: ['UK', 'US', 'CA', 'AU', 'DE', 'FR', 'JP'],
       devices: ['web', 'mobile', 'tablet'],
       userTypes: ['new', 'registered', 'premium'],
       trafficSplit: {
@@ -129,27 +129,9 @@
     return options[options.length - 1];
   }
 
-  function generateUserContext(): UserContext {
-    const userId = `user${Math.floor(Math.random() * 10000)}`;
-    const country = getRandomWithWeight(config.userProperties.trafficSplit, config.userProperties.countries);
-    const device = getRandomWithWeight(config.userProperties.trafficSplit, config.userProperties.devices);
-    const userType = getRandomWithWeight(config.userProperties.trafficSplit, config.userProperties.userTypes);
-
-    return {
-      user_id: userId,
-      session_id: `session${Math.floor(Math.random() * 10000)}`,
-      properties: {
-        country,
-        device,
-        user_type: userType,
-        timestamp: new Date().toISOString()
-      }
-    };
-  }
-
   function generateUserPool() {
     const userPool = [];
-    const countries = ['US', 'CA', 'UK', 'DE', 'FR', 'JP', 'AU'];
+    const countries = ['UK', 'US', 'CA', 'DE', 'FR', 'JP', 'AU'];
     const userTypes = ['new', 'registered', 'premium'];
     const platforms = ['web', 'mobile', 'tablet'];
 
