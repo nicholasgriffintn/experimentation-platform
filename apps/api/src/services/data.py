@@ -10,8 +10,15 @@ from ..schema.clickhouse_schema import ClickHouseSchemas
 from ..utils.logger import logger
 
 
-class ClickHouseDataService:
-    def __init__(self, host: str, port: int, user: str, password: str, database: str = "experiments"):
+class DataService:
+    def __init__(self,
+                 metadata_db: Session,
+                 host: str,
+                 port: int,
+                 user: str,
+                 password: str,
+                 database: str = "experiments",
+        ):
         """Initialize ClickHouse data service
         
         Args:
@@ -21,6 +28,7 @@ class ClickHouseDataService:
             password: ClickHouse password
             database: ClickHouse database name
         """
+        self.metadata_db = metadata_db
         self.host = host
         self.port = port
         self.user = user
@@ -105,10 +113,10 @@ class ClickHouseDataService:
             logger.error(f"Failed to create table {table_name}: {str(e)}")
             return False
 
-    async def get_experiment_config(self, experiment_id: str, db: Session) -> Dict:
+    async def get_experiment_config(self, experiment_id: str) -> Dict:
         """Get experiment configuration from database"""
         experiment = (
-            db.query(DBExperiment)
+            self.metadata_db.query(DBExperiment)
             .filter(DBExperiment.id == experiment_id)
             .options(joinedload(DBExperiment.variants))
             .first()
@@ -131,6 +139,21 @@ class ClickHouseDataService:
                 for variant in experiment.variants
             ],
         }
+    
+    async def set_experiment_config(self, experiment_id: str, config: Dict) -> None:
+        """Set experiment configuration in database"""
+        experiment = (
+            self.metadata_db.query(DBExperiment)
+            .filter(DBExperiment.id == experiment_id)
+            .first()
+        )
+        if not experiment:
+            return
+        
+        for key, value in config.items():
+            setattr(experiment, key, value)
+            
+        self.metadata_db.commit()
 
     async def record_event(self, experiment_id: str, event_data: Dict) -> None:
         """Record an experiment event in ClickHouse

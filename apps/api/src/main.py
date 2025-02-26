@@ -8,7 +8,7 @@ from .config.app import settings
 from .db.base import Base
 from .db.seed import seed_all
 from .db.session import engine
-from .dependencies import get_db, get_experiment_service
+from .dependencies import get_db, get_experiment_service, get_data_service
 from .middleware.error_handler import error_handler
 from .routers import experiments, features, metrics, system
 from .services.scheduler import ExperimentScheduler
@@ -80,8 +80,12 @@ async def startup_event() -> None:
         global scheduler
         db = next(get_db())
         experiment_service = get_experiment_service(db)
+        data_service = get_data_service()
         scheduler = ExperimentScheduler(
-            experiment_service=experiment_service, db=db, check_interval=60
+            experiment_service=experiment_service,
+            data_service=data_service,
+            db=db,
+            check_interval=60
         )
         asyncio.create_task(scheduler.start())
     else:

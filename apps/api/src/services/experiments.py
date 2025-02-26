@@ -11,7 +11,7 @@ from ..models.enums import VariantType
 from ..utils.logger import logger
 from .analysis import CombinedAnalysisService
 from .bucketing import BucketingService
-from .clickhouse_data import ClickHouseDataService
+from .data import DataService
 
 
 class VariantConfig(BaseModel):
@@ -40,7 +40,7 @@ class ExperimentSchedule(BaseModel):
 class ExperimentService:
     def __init__(
         self,
-        data_service: ClickHouseDataService,
+        data_service: DataService,
         analysis_service: CombinedAnalysisService,
         bucketing_service: Optional[BucketingService] = None,
         cache_service: Optional[Any] = None,
@@ -83,8 +83,11 @@ class ExperimentService:
             config = await self.cache_service.get_experiment_config(experiment_id)
             if config:
                 return cast(Dict[str, Any], config)
+            
+        if not self.data_service:
+            raise ValueError("A data service connection is required")
 
-        return await self.data_service.get_experiment_config(experiment_id, self.db)
+        return await self.data_service.get_experiment_config(experiment_id)
 
     async def initialize_experiment(self, experiment_id: str, config: Dict) -> bool:
         """Initialize a new experiment with required infrastructure
@@ -98,6 +101,8 @@ class ExperimentService:
         """
         if not await self.data_service.initialize_experiment_tables(experiment_id):
             return False
+        
+        await self.data_service.set_experiment_config(experiment_id, config)
 
         if self.cache_service:
             await self.cache_service.set_experiment_config(experiment_id, config)
@@ -383,11 +388,14 @@ class ExperimentService:
             experiment_id=experiment_id, event_data={"event_type": "stop", "reason": reason}
         )
 
-        if self.cache_service:
-            config = await self.cache_service.get_experiment_config(experiment_id)
-            if config:
-                config["status"] = "stopped"
-                config["stopped_reason"] = reason
+        config = await self._get_experiment_config(experiment_id)
+        if config:
+            config["status"] = "stopped"
+            config["stopped_reason"] = reason
+            
+            await self.data_service.set_experiment_config(experiment_id, config)
+
+            if self.cache_service:
                 await self.cache_service.set_experiment_config(experiment_id, config)
 
     async def update_schedule(self, experiment_id: str, schedule: Dict) -> None:
@@ -398,7 +406,11 @@ class ExperimentService:
         )
 
         if self.cache_service:
-            config = await self.cache_service.get_experiment_config(experiment_id)
+            config = await self._get_experiment_config(experiment_id)
             if config:
                 config["schedule"] = schedule
-                await self.cache_service.set_experiment_config(experiment_id, config)
+                
+                await self.data_service.set_experiment_config(experiment_id, config)
+                
+                if self.cache_service:
+                    await self.cache_service.set_experiment_config(experiment_id, config)

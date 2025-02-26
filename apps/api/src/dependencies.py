@@ -12,15 +12,18 @@ from .services.analysis import (
     StatisticalAnalysisService,
 )
 from .services.cache import CacheService, RedisCache
-from .services.clickhouse_data import ClickHouseDataService
+from .services.data import DataService
 from .services.experiments import ExperimentService
 from .services.scheduler import ExperimentScheduler
 
 
 @lru_cache
-def get_clickhouse_service() -> ClickHouseDataService:
-    """Get cached ClickHouseDataService instance."""
-    return ClickHouseDataService(
+def get_data_service(
+    metadata_db: Session = Depends(get_db),
+) -> DataService:
+    """Get cached DataService instance."""
+    return DataService(
+        metadata_db=metadata_db,
         host=settings.clickhouse_host,
         port=settings.clickhouse_port,
         user=settings.clickhouse_user,
@@ -71,7 +74,7 @@ def get_cache_service() -> CacheService:
 @lru_cache
 def get_experiment_service(
     db: Session = Depends(get_db),
-    data_service: ClickHouseDataService = Depends(get_clickhouse_service),
+    data_service: DataService = Depends(get_data_service),
     analysis_service: CombinedAnalysisService = Depends(get_analysis_service),
     cache_service: CacheService = Depends(get_cache_service),
 ) -> ExperimentService:
@@ -85,8 +88,14 @@ def get_experiment_service(
 
 def get_scheduler(
     experiment_service: ExperimentService = Depends(get_experiment_service),
+    data_service: DataService = Depends(get_data_service),
     db: Session = Depends(get_db),
 ) -> ExperimentScheduler:
     """Get ExperimentScheduler instance with active database session."""
-    return ExperimentScheduler(experiment_service=experiment_service, db=db, check_interval=60)
+    return ExperimentScheduler(
+        experiment_service=experiment_service,
+        data_service=data_service,
+        db=db,
+        check_interval=settings.scheduler_check_interval,
+    )
 

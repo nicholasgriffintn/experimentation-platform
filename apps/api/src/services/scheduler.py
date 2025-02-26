@@ -12,6 +12,7 @@ from ..models.experiments_model import ExperimentStatus
 from ..models.guardrails_model import GuardrailMetric, GuardrailOperator
 from ..utils.logger import logger
 from .experiments import ExperimentService
+from .data import DataService
 from .system_metrics import system_metrics
 
 
@@ -36,10 +37,12 @@ class ExperimentScheduler:
     def __init__(
         self,
         experiment_service: ExperimentService,
+        data_service: DataService,
         db: Session,
         check_interval: int = settings.scheduler_check_interval,
     ) -> None:
         self.experiment_service = experiment_service
+        self.data_service = data_service
         self.db = db
         self.check_interval = check_interval
         self.running = False
@@ -198,10 +201,13 @@ class ExperimentScheduler:
 
         if experiment:
             try:
+                if not self.data_service:
+                    raise ValueError("A data service connection is required")
+
                 setattr(experiment, "traffic_allocation", target_percentage)
                 self.db.commit()
 
-                await self.experiment_service.data_service.record_event(
+                await self.data_service.record_event(
                     experiment_id=experiment_id,
                     event_data={
                         "event_type": "traffic_allocation_update",
@@ -218,7 +224,10 @@ class ExperimentScheduler:
         to ensure we have sufficient data across all variants.
         """
         try:
-            exposure_data = await self.experiment_service.data_service.get_exposure_data(
+            if not self.data_service:
+                raise ValueError("A data service connection is required")
+
+            exposure_data = await self.data_service.get_exposure_data(
                 str(experiment.id)
             )
             if not exposure_data:
@@ -349,6 +358,13 @@ class ExperimentScheduler:
         """Gracefully stops an experiment and runs final analysis"""
         try:
             logger.info(f"Stopping experiment {experiment.id}")
+            
+            if not self.data_service:
+                raise ValueError("A data service connection is required")
+            
+            if not self.experiment_service:
+                raise ValueError("An experiment service connection is required")
+            
             system_metrics.increment("scheduler", "stop_experiment")
             setattr(experiment, "status", ExperimentStatus.COMPLETED)
             setattr(experiment, "ended_at", datetime.utcnow())
@@ -362,7 +378,7 @@ class ExperimentScheduler:
 
             await self.experiment_service.analyze_results(exp_id)
 
-            await self.experiment_service.data_service.record_event(
+            await self.data_service.record_event(
                 experiment_id=exp_id, event_data={"event_type": "stop", "reason": reason}
             )
 
@@ -374,8 +390,11 @@ class ExperimentScheduler:
     async def _check_guardrails(self, experiment: Experiment) -> None:
         """Monitors experiment metrics against defined safety thresholds"""
         try:
+            if not self.data_service:
+                raise ValueError("A data service connection is required")
+
             for guardrail in experiment.guardrail_metrics:
-                metric_data = await self.experiment_service.data_service.get_metric_data(
+                metric_data = await self.data_service.get_metric_data(
                     experiment_id=str(experiment.id), metric_name=guardrail.metric_name
                 )
 
@@ -396,10 +415,14 @@ class ExperimentScheduler:
         self, experiment: Experiment, guardrail: GuardrailMetric
     ) -> None:
         """Handle a guardrail violation"""
+        
+        if not self.data_service:
+            raise ValueError("A data service connection is required")
+        
         reason = f"Guardrail violation: {guardrail.metric_name} {guardrail.operator} {guardrail.threshold}"
         await self.stop_experiment(experiment, reason=reason)
 
-        await self.experiment_service.data_service.record_event(
+        await self.data_service.record_event(
             experiment_id=str(experiment.id),
             event_data={
                 "event_type": "guardrail_violation",

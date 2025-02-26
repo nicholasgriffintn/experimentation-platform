@@ -9,16 +9,16 @@ from ..models.analysis_model import AnalysisMethod, CorrectionMethod
 from ..models.experiments_model import ExperimentStatus, ExperimentType
 from ..models.guardrails_model import GuardrailOperator
 from ..models.variants_model import VariantType
-from ..services.clickhouse_data import ClickHouseDataService
+from ..services.data import DataService
 from ..utils.logger import logger
 from .base import Experiment as DBExperiment
 from .base import ExperimentMetric, FeatureDefinition, GuardrailMetric, MetricDefinition
 from .base import Variant as DBVariant
 
 
-def get_data_service() -> ClickHouseDataService:
+def get_data_service() -> DataService:
     """Get initialized data service instance."""
-    return ClickHouseDataService(
+    return DataService(
         host=settings.clickhouse_host,
         port=settings.clickhouse_port,
         user=settings.clickhouse_user,
