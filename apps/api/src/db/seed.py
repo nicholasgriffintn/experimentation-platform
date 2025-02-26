@@ -8,7 +8,7 @@ from ..config.app import settings
 from ..models.analysis_model import AnalysisMethod, CorrectionMethod
 from ..models.experiments_model import ExperimentStatus, ExperimentType
 from ..models.guardrails_model import GuardrailOperator
-from ..models.variants_model import VariantConfig, VariantType
+from ..models.variants_model import VariantType
 from ..services.clickhouse_data import ClickHouseDataService
 from ..utils.logger import logger
 from .base import Experiment as DBExperiment
@@ -272,7 +272,7 @@ def seed_demo_experiment(db: Session) -> None:
         experiment_id=experiment.id,
         name="Control",
         type=VariantType.CONTROL,
-        config=VariantConfig(button_color="blue").model_dump(),
+        config={"button_color": "blue"},
         traffic_percentage=50.0,
     )
 
@@ -281,7 +281,7 @@ def seed_demo_experiment(db: Session) -> None:
         experiment_id=experiment.id,
         name="Treatment",
         type=VariantType.TREATMENT,
-        config=VariantConfig(button_color="green").model_dump(),
+        config={"button_color": "green"},
         traffic_percentage=50.0,
     )
 
@@ -299,7 +299,7 @@ def seed_demo_experiment(db: Session) -> None:
         experiment_id=experiment.id,
         metric_name="bounce_rate",
         threshold=5.0,
-        operator=GuardrailOperator.LT,
+        operator=GuardrailOperator.LESS_THAN,
     )
     db.add(guardrail)
 
@@ -340,7 +340,7 @@ def seed_multivariate_experiment(db: Session) -> None:
         updated_at=datetime.utcnow(),
         analysis_method=AnalysisMethod.BAYESIAN,
         confidence_level=0.95,
-        correction_method=CorrectionMethod.BONFERRONI,
+        correction_method=CorrectionMethod.HOLM,
         sequential_testing=True,
         stopping_threshold=0.01,
         metric_configs={
@@ -360,25 +360,25 @@ def seed_multivariate_experiment(db: Session) -> None:
         {
             "name": "Control",
             "type": VariantType.CONTROL,
-            "config": VariantConfig(layout="default", theme="light").model_dump(),
+            "config": {"layout": "default", "theme": "light"},
             "traffic_percentage": 25.0,
         },
         {
             "name": "Layout Compact",
             "type": VariantType.TREATMENT,
-            "config": VariantConfig(layout="compact", theme="light").model_dump(),
+            "config": {"layout": "compact", "theme": "light"},
             "traffic_percentage": 25.0,
         },
         {
             "name": "Dark Theme",
             "type": VariantType.TREATMENT,
-            "config": VariantConfig(layout="default", theme="dark").model_dump(),
+            "config": {"layout": "default", "theme": "dark"},
             "traffic_percentage": 25.0,
         },
         {
             "name": "Compact Dark",
             "type": VariantType.TREATMENT,
-            "config": VariantConfig(layout="compact", theme="dark").model_dump(),
+            "config": {"layout": "compact", "theme": "dark"},
             "traffic_percentage": 25.0,
         },
     ]
@@ -455,7 +455,7 @@ def seed_feature_flag_experiment(db: Session) -> None:
         experiment_id=experiment.id,
         name="Control",
         type=VariantType.CONTROL,
-        config=VariantConfig(show_recommendations="false").model_dump(),
+        config={"show_recommendations": "false"},
         traffic_percentage=50.0,
     )
 
@@ -464,7 +464,7 @@ def seed_feature_flag_experiment(db: Session) -> None:
         experiment_id=experiment.id,
         name="Recommendations On",
         type=VariantType.TREATMENT,
-        config=VariantConfig(show_recommendations="true").model_dump(),
+        config={"show_recommendations": "true"},
         traffic_percentage=50.0,
     )
 
@@ -482,175 +482,12 @@ def seed_feature_flag_experiment(db: Session) -> None:
         experiment_id=experiment.id,
         metric_name="bounce_rate",
         threshold=10.0,
-        operator=GuardrailOperator.LT,
+        operator=GuardrailOperator.LESS_THAN,
     )
     db.add(guardrail)
 
     db.commit()
     logger.info("Created feature flag experiment")
-
-    # Initialize ClickHouse tables
-    data_service = get_data_service()
-    try:
-        data_service.initialize_experiment_tables(experiment.id)
-        logger.info(f"Initialized ClickHouse tables for experiment {experiment.id}")
-    except Exception as e:
-        logger.error(f"Failed to initialize ClickHouse tables: {str(e)}")
-
-
-def seed_holdout_experiment(db: Session) -> None:
-    """Seed a holdout experiment."""
-    experiment = (
-        db.query(DBExperiment).filter(DBExperiment.name == "Global Holdout Test").first()
-    )
-
-    if experiment:
-        logger.info("Holdout experiment already exists, skipping")
-        return
-
-    # Create experiment
-    experiment = DBExperiment(
-        id=str(uuid4()),
-        name="Global Holdout Test",
-        description="Measuring the cumulative impact of all experiments",
-        type=ExperimentType.HOLDOUT,
-        hypothesis="The cumulative effect of all experiments is positive",
-        targeting_rules={},
-        parameters={},
-        status=ExperimentStatus.DRAFT,
-        traffic_allocation=10.0,  # Only 10% of users in holdout
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        analysis_method=AnalysisMethod.FREQUENTIST,
-        confidence_level=0.95,
-        correction_method=CorrectionMethod.NONE,
-        sequential_testing=False,
-        metric_configs={
-            "revenue_per_user": {"min_sample_size": 5000, "min_effect_size": 0.02},
-            "conversion_rate": {"min_sample_size": 5000, "min_effect_size": 0.02},
-        },
-        default_metric_config={"min_sample_size": 5000, "min_effect_size": 0.02},
-    )
-
-    db.add(experiment)
-    db.flush()
-
-    # Create variants
-    control = DBVariant(
-        id=str(uuid4()),
-        experiment_id=experiment.id,
-        name="Holdout Group",
-        type=VariantType.CONTROL,
-        config=VariantConfig().model_dump(),
-        traffic_percentage=100.0,  # All holdout traffic goes to this variant
-    )
-
-    db.add(control)
-
-    # Add metrics
-    metrics = ["revenue_per_user", "conversion_rate", "session_duration", "bounce_rate"]
-    for metric_name in metrics:
-        metric = ExperimentMetric(experiment_id=experiment.id, metric_name=metric_name)
-        db.add(metric)
-
-    db.commit()
-    logger.info("Created holdout experiment")
-
-    # Initialize ClickHouse tables
-    data_service = get_data_service()
-    try:
-        data_service.initialize_experiment_tables(experiment.id)
-        logger.info(f"Initialized ClickHouse tables for experiment {experiment.id}")
-    except Exception as e:
-        logger.error(f"Failed to initialize ClickHouse tables: {str(e)}")
-
-
-def seed_bandit_experiment(db: Session) -> None:
-    """Seed a multi-armed bandit experiment."""
-    experiment = (
-        db.query(DBExperiment).filter(DBExperiment.name == "Pricing Model Bandit").first()
-    )
-
-    if experiment:
-        logger.info("Bandit experiment already exists, skipping")
-        return
-
-    # Create experiment
-    experiment = DBExperiment(
-        id=str(uuid4()),
-        name="Pricing Model Bandit",
-        description="Optimizing pricing model using multi-armed bandit",
-        type=ExperimentType.BANDIT,
-        hypothesis="Different pricing models will have different conversion rates",
-        targeting_rules={"new_user": True},
-        parameters={"algorithm": "thompson_sampling", "exploration_rate": 0.1},
-        status=ExperimentStatus.DRAFT,
-        traffic_allocation=100.0,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        analysis_method=AnalysisMethod.BAYESIAN,
-        confidence_level=0.95,
-        correction_method=CorrectionMethod.NONE,
-        sequential_testing=True,
-        metric_configs={
-            "conversion_rate": {"min_sample_size": 100, "min_effect_size": 0.05},
-            "revenue_per_user": {"min_sample_size": 100, "min_effect_size": 0.05},
-        },
-        default_metric_config={"min_sample_size": 100, "min_effect_size": 0.05},
-        prior_successes=10,
-        prior_trials=100,
-    )
-
-    db.add(experiment)
-    db.flush()
-
-    # Create variants
-    variants = [
-        {
-            "name": "Monthly",
-            "type": VariantType.TREATMENT,
-            "config": VariantConfig(pricing_model="monthly").model_dump(),
-            "traffic_percentage": 25.0,
-        },
-        {
-            "name": "Annual",
-            "type": VariantType.TREATMENT,
-            "config": VariantConfig(pricing_model="annual").model_dump(),
-            "traffic_percentage": 25.0,
-        },
-        {
-            "name": "Lifetime",
-            "type": VariantType.TREATMENT,
-            "config": VariantConfig(pricing_model="lifetime").model_dump(),
-            "traffic_percentage": 25.0,
-        },
-        {
-            "name": "Freemium",
-            "type": VariantType.TREATMENT,
-            "config": VariantConfig(pricing_model="freemium").model_dump(),
-            "traffic_percentage": 25.0,
-        },
-    ]
-
-    for variant_data in variants:
-        variant = DBVariant(
-            id=str(uuid4()),
-            experiment_id=experiment.id,
-            name=variant_data["name"],
-            type=variant_data["type"],
-            config=variant_data["config"],
-            traffic_percentage=variant_data["traffic_percentage"],
-        )
-        db.add(variant)
-
-    # Add metrics
-    metrics = ["conversion_rate", "revenue_per_user"]
-    for metric_name in metrics:
-        metric = ExperimentMetric(experiment_id=experiment.id, metric_name=metric_name)
-        db.add(metric)
-
-    db.commit()
-    logger.info("Created bandit experiment")
 
     # Initialize ClickHouse tables
     data_service = get_data_service()
@@ -668,6 +505,4 @@ async def seed_all(db: Session) -> None:
     seed_demo_experiment(db)
     seed_multivariate_experiment(db)
     seed_feature_flag_experiment(db)
-    seed_holdout_experiment(db)
-    seed_bandit_experiment(db)
     logger.info("Database seeding completed")

@@ -81,7 +81,6 @@ def get_experiment_service(
         analysis_service=analysis_service,
         cache_service=cache_service,
         db=db,
-        check_interval=settings.scheduler_check_interval,
     )
 
 def get_scheduler(
