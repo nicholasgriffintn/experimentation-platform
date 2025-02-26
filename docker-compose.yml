@@ -138,6 +138,7 @@ services:
       - clickhouse_data:/var/lib/clickhouse
       - ./docker/clickhouse/config:/etc/clickhouse-server/config.d
       - ./docker/clickhouse/users:/etc/clickhouse-server/users.d
+      - ./docker/clickhouse/init:/docker-entrypoint-initdb.d
     ulimits:
       nofile:
         soft: 262144
@@ -151,27 +152,6 @@ services:
       timeout: 3s
       retries: 10
       start_period: 20s
-
-  clickhouse-init:
-    image: clickhouse/clickhouse-client:latest
-    networks:
-      - experimentation_net
-    depends_on:
-      clickhouse-server:
-        condition: service_healthy
-    volumes:
-      - ./docker/clickhouse/init:/docker-entrypoint-initdb.d
-    command: >
-      bash -c '
-      echo "Waiting for ClickHouse to be ready...";
-      sleep 5;
-      echo "Running initialization scripts...";
-      for f in /docker-entrypoint-initdb.d/*.sql; do
-        echo "Executing $f";
-        cat $f | clickhouse-client --host clickhouse-server;
-      done;
-      echo "ClickHouse initialization completed.";
-      '
 
   zookeeper:
     image: zookeeper:3.7

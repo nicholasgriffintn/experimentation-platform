@@ -8,6 +8,13 @@
     <tcp_port>9000</tcp_port>
     <interserver_http_port>9009</interserver_http_port>
 
+    <listen_host>0.0.0.0</listen_host>
+
+    <http_options>
+        <allow_credentials>1</allow_credentials>
+        <allow_headers>Origin, X-Requested-With, Content-Type, Accept, Authorization</allow_headers>
+    </http_options>
+
     <max_connections>4096</max_connections>
     <keep_alive_timeout>300</keep_alive_timeout>
     <max_concurrent_queries>100</max_concurrent_queries>
