@@ -71,11 +71,13 @@ class DataService:
         Returns:
             bool: True if all tables were created successfully or already exist, False otherwise
         """
+        safe_experiment_id = experiment_id.replace("-", "_")
+        
         tables_to_create = [
-            (f"{experiment_id}_events", self.schemas.get_events_schema()),
-            (f"{experiment_id}_metrics", self.schemas.get_metrics_schema()),
-            (f"{experiment_id}_assignments", self.schemas.get_assignments_schema()),
-            (f"{experiment_id}_results", self.schemas.get_results_schema()),
+            (f"{safe_experiment_id}_events", self.schemas.get_events_schema()),
+            (f"{safe_experiment_id}_metrics", self.schemas.get_metrics_schema()),
+            (f"{safe_experiment_id}_assignments", self.schemas.get_assignments_schema()),
+            (f"{safe_experiment_id}_results", self.schemas.get_results_schema()),
         ]
 
         success = True
@@ -162,7 +164,8 @@ class DataService:
             experiment_id: ID of the experiment
             event_data: Event data to record
         """
-        table_name = f"{experiment_id}_events"
+        safe_experiment_id = experiment_id.replace("-", "_")
+        table_name = f"{safe_experiment_id}_events"
         event_data["event_id"] = event_data.get("event_id", str(uuid.uuid4()))
         event_data["experiment_id"] = experiment_id
         event_data["timestamp"] = event_data.get("timestamp", datetime.utcnow())
@@ -180,7 +183,8 @@ class DataService:
             experiment_id: ID of the experiment
             metric_data: Metric data to record
         """
-        table_name = f"{experiment_id}_metrics"
+        safe_experiment_id = experiment_id.replace("-", "_")
+        table_name = f"{safe_experiment_id}_metrics"
         metric_data["metric_id"] = metric_data.get("metric_id", str(uuid.uuid4()))
         metric_data["experiment_id"] = experiment_id
         metric_data["timestamp"] = metric_data.get("timestamp", datetime.utcnow())
@@ -202,7 +206,8 @@ class DataService:
             variant_id: ID of the variant
             context: Additional context data
         """
-        table_name = f"{experiment_id}_assignments"
+        safe_experiment_id = experiment_id.replace("-", "_")
+        table_name = f"{safe_experiment_id}_assignments"
         assignment_data = {
             "assignment_id": str(uuid.uuid4()),
             "experiment_id": experiment_id,
@@ -225,7 +230,8 @@ class DataService:
             experiment_id: ID of the experiment
             results_data: Results data to record
         """
-        table_name = f"{experiment_id}_results"
+        safe_experiment_id = experiment_id.replace("-", "_")
+        table_name = f"{safe_experiment_id}_results"
         results_data["result_id"] = results_data.get("result_id", str(uuid.uuid4()))
         results_data["experiment_id"] = experiment_id
         results_data["timestamp"] = results_data.get("timestamp", datetime.utcnow())
@@ -249,7 +255,8 @@ class DataService:
         Returns:
             List of event dictionaries
         """
-        table_name = f"{experiment_id}_events"
+        safe_experiment_id = experiment_id.replace("-", "_")
+        table_name = f"{safe_experiment_id}_events"
         query = f"""
         SELECT *
         FROM {self.database}.{table_name}
@@ -277,7 +284,8 @@ class DataService:
         Returns:
             List of metric value dictionaries
         """
-        table_name = f"{experiment_id}_metrics"
+        safe_experiment_id = experiment_id.replace("-", "_")
+        table_name = f"{safe_experiment_id}_metrics"
         query = f"""
         SELECT *
         FROM {self.database}.{table_name}
@@ -302,7 +310,8 @@ class DataService:
         Returns:
             List of exposure dictionaries
         """
-        table_name = f"{experiment_id}_assignments"
+        safe_experiment_id = experiment_id.replace("-", "_")
+        table_name = f"{safe_experiment_id}_assignments"
         query = f"""
         SELECT variant_id, count() as count
         FROM {self.database}.{table_name}
@@ -326,7 +335,8 @@ class DataService:
         Returns:
             Dictionary mapping variant IDs to lists of metric values
         """
-        table_name = f"{experiment_id}_metrics"
+        safe_experiment_id = experiment_id.replace("-", "_")
+        table_name = f"{safe_experiment_id}_metrics"
         query = f"""
         SELECT variant_id, metric_value
         FROM {self.database}.{table_name}
@@ -361,7 +371,8 @@ class DataService:
         Returns:
             Dictionary with experiment snapshot data
         """
-        assignments_table = f"{experiment_id}_assignments"
+        safe_experiment_id = experiment_id.replace("-", "_")
+        assignments_table = f"{safe_experiment_id}_assignments"
         assignments_query = f"""
         SELECT variant_id, count() as count
         FROM {self.database}.{assignments_table}
@@ -377,7 +388,8 @@ class DataService:
         
         assignments = self._execute_query(assignments_query, assignments_params)
         
-        events_table = f"{experiment_id}_events"
+        safe_experiment_id = experiment_id.replace("-", "_")
+        events_table = f"{safe_experiment_id}_events"
         events_query = f"""
         SELECT variant_id, event_type, count() as count
         FROM {self.database}.{events_table}
@@ -405,4 +417,4 @@ class DataService:
                 result["events"][variant_id] = {}
             result["events"][variant_id][event_type] = row["count"]
             
-        return result 
+        return result

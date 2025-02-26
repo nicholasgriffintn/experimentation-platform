@@ -16,9 +16,12 @@ from .base import ExperimentMetric, FeatureDefinition, GuardrailMetric, MetricDe
 from .base import Variant as DBVariant
 
 
-def get_data_service() -> DataService:
+def get_data_service(
+    metadata_db: Session
+) -> DataService:
     """Get initialized data service instance."""
     return DataService(
+        metadata_db=metadata_db,
         host=settings.clickhouse_host,
         port=settings.clickhouse_port,
         user=settings.clickhouse_user,
@@ -228,10 +231,10 @@ def seed_features(db: Session) -> None:
     db.commit()
 
 
-def seed_ab_test_experiment(db: Session) -> None:
+async def seed_ab_test_experiment(db: Session) -> None:
     """Seed an A/B test experiment."""
     experiment = (
-        db.query(DBExperiment).filter(DBExperiment.name == "Demo A/B Test").first()
+        db.query(DBExperiment).filter(DBExperiment.name == "Simple A/B Test").first()
     )
 
     if experiment:
@@ -241,7 +244,7 @@ def seed_ab_test_experiment(db: Session) -> None:
     # Create experiment
     experiment = DBExperiment(
         id=str(uuid4()),
-        name="A/B Test",
+        name="Simple A/B Test",
         description="A simple A/B test for demos.",
         type=ExperimentType.AB_TEST,
         hypothesis="Changing the button color to green will increase conversion rate",
@@ -307,18 +310,20 @@ def seed_ab_test_experiment(db: Session) -> None:
     logger.info("Created demo experiment")
 
     # Initialize ClickHouse tables
-    data_service = get_data_service()
+    data_service = get_data_service(
+        metadata_db=db
+    )
     try:
-        data_service.initialize_experiment_tables(experiment.id)
+        await data_service.initialize_experiment_tables(experiment.id)
         logger.info(f"Initialized ClickHouse tables for experiment {experiment.id}")
     except Exception as e:
         logger.error(f"Failed to initialize ClickHouse tables: {str(e)}")
 
 
-def seed_multivariate_experiment(db: Session) -> None:
+async def seed_multivariate_experiment(db: Session) -> None:
     """Seed a multivariate test experiment."""
     experiment = (
-        db.query(DBExperiment).filter(DBExperiment.name == "Multivariate Layout Test").first()
+        db.query(DBExperiment).filter(DBExperiment.name == "Multivariate Test").first()
     )
 
     if experiment:
@@ -404,18 +409,20 @@ def seed_multivariate_experiment(db: Session) -> None:
     logger.info("Created multivariate experiment")
 
     # Initialize ClickHouse tables
-    data_service = get_data_service()
+    data_service = get_data_service(
+        metadata_db=db
+    )
     try:
-        data_service.initialize_experiment_tables(experiment.id)
+        await data_service.initialize_experiment_tables(experiment.id)
         logger.info(f"Initialized ClickHouse tables for experiment {experiment.id}")
     except Exception as e:
         logger.error(f"Failed to initialize ClickHouse tables: {str(e)}")
 
 
-def seed_feature_flag_experiment(db: Session) -> None:
+async def seed_feature_flag_experiment(db: Session) -> None:
     """Seed a feature flag experiment."""
     experiment = (
-        db.query(DBExperiment).filter(DBExperiment.name == "Recommendations Feature Flag").first()
+        db.query(DBExperiment).filter(DBExperiment.name == "Feature Flag Test").first()
     )
 
     if experiment:
@@ -490,15 +497,17 @@ def seed_feature_flag_experiment(db: Session) -> None:
     logger.info("Created feature flag experiment")
 
     # Initialize ClickHouse tables
-    data_service = get_data_service()
+    data_service = get_data_service(
+        metadata_db=db
+    )
     try:
-        data_service.initialize_experiment_tables(experiment.id)
+        await data_service.initialize_experiment_tables(experiment.id)
         logger.info(f"Initialized ClickHouse tables for experiment {experiment.id}")
     except Exception as e:
         logger.error(f"Failed to initialize ClickHouse tables: {str(e)}")
 
 
-def seed_running_ab_test_experiment(db: Session) -> None:
+async def seed_running_ab_test_experiment(db: Session) -> None:
     """Seed a running A/B test experiment."""
     experiment = (
         db.query(DBExperiment).filter(DBExperiment.name == "Running A/B Test").first()
@@ -578,15 +587,17 @@ def seed_running_ab_test_experiment(db: Session) -> None:
     logger.info("Created running A/B test experiment")
 
     # Initialize ClickHouse tables
-    data_service = get_data_service()
+    data_service = get_data_service(
+        metadata_db=db
+    )
     try:
-        data_service.initialize_experiment_tables(experiment.id)
+        await data_service.initialize_experiment_tables(experiment.id)
         logger.info(f"Initialized ClickHouse tables for experiment {experiment.id}")
     except Exception as e:
         logger.error(f"Failed to initialize ClickHouse tables: {str(e)}")
 
 
-def seed_scheduled_ab_test_experiment(db: Session) -> None:
+async def seed_scheduled_ab_test_experiment(db: Session) -> None:
     """Seed a scheduled A/B test experiment."""
     experiment = (
         db.query(DBExperiment).filter(DBExperiment.name == "Scheduled A/B Test").first()
@@ -665,14 +676,16 @@ def seed_scheduled_ab_test_experiment(db: Session) -> None:
     logger.info("Created scheduled A/B test experiment")
     
     # Initialize ClickHouse tables
-    data_service = get_data_service()
+    data_service = get_data_service(
+        metadata_db=db
+    )
     try:
-        data_service.initialize_experiment_tables(experiment.id)
+        await data_service.initialize_experiment_tables(experiment.id)
         logger.info(f"Initialized ClickHouse tables for experiment {experiment.id}")
     except Exception as e:
         logger.error(f"Failed to initialize ClickHouse tables: {str(e)}")
 
-def seed_completed_ab_test_experiment(db: Session) -> None:
+async def seed_completed_ab_test_experiment(db: Session) -> None:
     """Seed a completed A/B test experiment."""
     experiment = (
         db.query(DBExperiment).filter(DBExperiment.name == "Completed A/B Test").first()
@@ -751,9 +764,11 @@ def seed_completed_ab_test_experiment(db: Session) -> None:
     logger.info("Created completed A/B test experiment")
     
     # Initialize ClickHouse tables
-    data_service = get_data_service()
+    data_service = get_data_service(
+        metadata_db=db
+    )
     try:
-        data_service.initialize_experiment_tables(experiment.id)
+        await data_service.initialize_experiment_tables(experiment.id)
         logger.info(f"Initialized ClickHouse tables for experiment {experiment.id}")
     except Exception as e:
         logger.error(f"Failed to initialize ClickHouse tables: {str(e)}")
@@ -763,10 +778,10 @@ async def seed_all(db: Session) -> None:
     """Seed all data."""
     seed_metrics(db)
     seed_features(db)
-    seed_ab_test_experiment(db)
-    seed_multivariate_experiment(db)
-    seed_feature_flag_experiment(db)
-    seed_running_ab_test_experiment(db)
-    seed_scheduled_ab_test_experiment(db)
-    seed_completed_ab_test_experiment(db)
+    await seed_ab_test_experiment(db)
+    await seed_multivariate_experiment(db)
+    await seed_feature_flag_experiment(db)
+    await seed_running_ab_test_experiment(db)
+    await seed_scheduled_ab_test_experiment(db)
+    await seed_completed_ab_test_experiment(db)
     logger.info("Database seeding completed")
