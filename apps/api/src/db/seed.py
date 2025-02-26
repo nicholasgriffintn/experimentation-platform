@@ -228,21 +228,21 @@ def seed_features(db: Session) -> None:
     db.commit()
 
 
-def seed_demo_experiment(db: Session) -> None:
-    """Seed a demo A/B test experiment."""
+def seed_ab_test_experiment(db: Session) -> None:
+    """Seed an A/B test experiment."""
     experiment = (
         db.query(DBExperiment).filter(DBExperiment.name == "Demo A/B Test").first()
     )
 
     if experiment:
-        logger.info("Demo experiment already exists, skipping")
+        logger.info("A/B test experiment already exists, skipping")
         return
 
     # Create experiment
     experiment = DBExperiment(
         id=str(uuid4()),
-        name="Demo A/B Test",
-        description="A demonstration A/B test for the experimentation platform",
+        name="A/B Test",
+        description="A simple A/B test for demos.",
         type=ExperimentType.AB_TEST,
         hypothesis="Changing the button color to green will increase conversion rate",
         targeting_rules={},
@@ -328,8 +328,8 @@ def seed_multivariate_experiment(db: Session) -> None:
     # Create experiment
     experiment = DBExperiment(
         id=str(uuid4()),
-        name="Multivariate Layout Test",
-        description="Testing different combinations of layout and theme",
+        name="Multivariate Test",
+        description="A simple multivariate test for demos.",
         type=ExperimentType.MULTIVARIATE,
         hypothesis="Different combinations of layout and theme will affect user engagement",
         targeting_rules={"country": ["US", "CA", "UK"]},
@@ -425,8 +425,8 @@ def seed_feature_flag_experiment(db: Session) -> None:
     # Create experiment
     experiment = DBExperiment(
         id=str(uuid4()),
-        name="Recommendations Feature Flag",
-        description="Testing the impact of showing personalized recommendations",
+        name="Feature Flag Test",
+        description="A simple feature flag test for demos.",
         type=ExperimentType.FEATURE_FLAG,
         hypothesis="Showing personalized recommendations will increase engagement and revenue",
         targeting_rules={"user_type": ["registered"]},
@@ -498,11 +498,275 @@ def seed_feature_flag_experiment(db: Session) -> None:
         logger.error(f"Failed to initialize ClickHouse tables: {str(e)}")
 
 
+def seed_running_ab_test_experiment(db: Session) -> None:
+    """Seed a running A/B test experiment."""
+    experiment = (
+        db.query(DBExperiment).filter(DBExperiment.name == "Running A/B Test").first()
+    )
+
+    if experiment:
+        logger.info("Running A/B test experiment already exists, skipping")
+        return
+    
+    # Create experiment
+    experiment = DBExperiment(
+        id=str(uuid4()),
+        name="Running A/B Test",
+        description="A running A/B test for demos.",
+        type=ExperimentType.AB_TEST,
+        status=ExperimentStatus.RUNNING,
+        traffic_allocation=100.0,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+        analysis_method=AnalysisMethod.FREQUENTIST,
+        confidence_level=0.95,
+        correction_method=CorrectionMethod.NONE,
+        sequential_testing=True,
+        stopping_threshold=0.01,
+        metric_configs={
+            "conversion_rate": {"min_sample_size": 100, "min_effect_size": 0.05},
+            "revenue_per_user": {"min_sample_size": 200, "min_effect_size": 0.1},
+        },
+        default_metric_config={"min_sample_size": 100, "min_effect_size": 0.01},
+        start_time=datetime.utcnow() - timedelta(days=1),
+        end_time=datetime.utcnow() + timedelta(days=15),
+        ramp_up_period=48,
+        auto_stop_conditions={"min_conversions": 1000},
+        targeting_rules={"country": ["US", "CA"], "user_type": "registered"},
+    )
+    db.add(experiment)
+    db.flush()
+    
+    # Create variants
+    control = DBVariant(
+        id=str(uuid4()),
+        experiment_id=experiment.id,
+        name="Control",
+        type=VariantType.CONTROL,
+        config={"button_color": "blue"},
+        traffic_percentage=50.0,
+    )
+    
+    treatment = DBVariant(
+        id=str(uuid4()),
+        experiment_id=experiment.id,
+        name="Treatment",
+        type=VariantType.TREATMENT,
+        config={"button_color": "green"},
+        traffic_percentage=50.0,
+    )
+    
+    db.add(control)
+    db.add(treatment)
+    
+    # Add metrics
+    metrics = ["conversion_rate", "revenue_per_user"]
+    for metric_name in metrics:
+        metric = ExperimentMetric(experiment_id=experiment.id, metric_name=metric_name)
+        db.add(metric)
+        
+    # Add guardrail metrics
+    guardrail = GuardrailMetric(
+        experiment_id=experiment.id,
+        metric_name="bounce_rate",
+        threshold=10.0,
+        operator=GuardrailOperator.LESS_THAN,
+    )
+    db.add(guardrail)
+    
+    db.commit()
+    logger.info("Created running A/B test experiment")
+
+    # Initialize ClickHouse tables
+    data_service = get_data_service()
+    try:
+        data_service.initialize_experiment_tables(experiment.id)
+        logger.info(f"Initialized ClickHouse tables for experiment {experiment.id}")
+    except Exception as e:
+        logger.error(f"Failed to initialize ClickHouse tables: {str(e)}")
+
+
+def seed_scheduled_ab_test_experiment(db: Session) -> None:
+    """Seed a scheduled A/B test experiment."""
+    experiment = (
+        db.query(DBExperiment).filter(DBExperiment.name == "Scheduled A/B Test").first()
+    )
+    
+    if experiment:
+        logger.info("Scheduled A/B test experiment already exists, skipping")
+        return
+    
+    # Create experiment
+    experiment = DBExperiment(
+        id=str(uuid4()),
+        name="Scheduled A/B Test",
+        description="A scheduled A/B test for demos.",
+        type=ExperimentType.AB_TEST,
+        status=ExperimentStatus.SCHEDULED,
+        traffic_allocation=100.0,
+        start_time=datetime.utcnow() + timedelta(days=1),
+        end_time=datetime.utcnow() + timedelta(days=15),
+        ramp_up_period=48,
+        auto_stop_conditions={"min_conversions": 1000},
+        targeting_rules={"country": ["US", "CA"], "user_type": "registered"},
+        analysis_method=AnalysisMethod.FREQUENTIST,
+        confidence_level=0.95,
+        correction_method=CorrectionMethod.NONE,
+        sequential_testing=True,
+        stopping_threshold=0.01,
+        metric_configs={
+            "conversion_rate": {"min_sample_size": 100, "min_effect_size": 0.05},
+            "revenue_per_user": {"min_sample_size": 200, "min_effect_size": 0.1},
+        },
+        default_metric_config={"min_sample_size": 100, "min_effect_size": 0.01},
+    )
+    
+    db.add(experiment)
+    db.flush()
+    
+    # Create variants
+    control = DBVariant(
+        id=str(uuid4()),
+        experiment_id=experiment.id,
+        name="Control",
+        type=VariantType.CONTROL,
+        config={"button_color": "blue"},
+        traffic_percentage=50.0,
+    )
+    
+    treatment = DBVariant(
+        id=str(uuid4()),
+        experiment_id=experiment.id,
+        name="Treatment",
+        type=VariantType.TREATMENT,
+        config={"button_color": "green"},
+        traffic_percentage=50.0,
+    )
+    
+    db.add(control)
+    db.add(treatment)
+    
+    # Add metrics
+    metrics = ["conversion_rate", "revenue_per_user"]
+    for metric_name in metrics:
+        metric = ExperimentMetric(experiment_id=experiment.id, metric_name=metric_name)
+        db.add(metric)
+        
+    # Add guardrail metrics
+    guardrail = GuardrailMetric(
+        experiment_id=experiment.id,
+        metric_name="bounce_rate",
+        threshold=10.0,
+        operator=GuardrailOperator.LESS_THAN,
+    )
+    db.add(guardrail)
+    
+    db.commit()
+    logger.info("Created scheduled A/B test experiment")
+    
+    # Initialize ClickHouse tables
+    data_service = get_data_service()
+    try:
+        data_service.initialize_experiment_tables(experiment.id)
+        logger.info(f"Initialized ClickHouse tables for experiment {experiment.id}")
+    except Exception as e:
+        logger.error(f"Failed to initialize ClickHouse tables: {str(e)}")
+
+def seed_completed_ab_test_experiment(db: Session) -> None:
+    """Seed a completed A/B test experiment."""
+    experiment = (
+        db.query(DBExperiment).filter(DBExperiment.name == "Completed A/B Test").first()
+    )
+    
+    if experiment:
+        logger.info("Completed A/B test experiment already exists, skipping")
+        return
+    
+    # Create experiment
+    experiment = DBExperiment(
+        id=str(uuid4()),
+        name="Completed A/B Test",
+        description="A completed A/B test for demos.",
+        type=ExperimentType.AB_TEST,
+        status=ExperimentStatus.COMPLETED,
+        traffic_allocation=100.0,
+        start_time=datetime.utcnow() - timedelta(days=15),
+        end_time=datetime.utcnow(),
+        ramp_up_period=0,
+        auto_stop_conditions={"min_conversions": 1000},
+        targeting_rules={"country": ["US", "CA"], "user_type": "registered"},
+        analysis_method=AnalysisMethod.FREQUENTIST,
+        confidence_level=0.95,
+        correction_method=CorrectionMethod.NONE,
+        sequential_testing=False,
+        stopping_threshold=0.01,
+        metric_configs={
+            "conversion_rate": {"min_sample_size": 100, "min_effect_size": 0.05},
+            "revenue_per_user": {"min_sample_size": 200, "min_effect_size": 0.1},
+        },
+        default_metric_config={"min_sample_size": 100, "min_effect_size": 0.01},
+    )
+    
+    db.add(experiment)
+    db.flush()
+    
+    # Create variants
+    control = DBVariant(
+        id=str(uuid4()),
+        experiment_id=experiment.id,
+        name="Control",
+        type=VariantType.CONTROL,
+        config={"button_color": "blue"},
+        traffic_percentage=50.0,
+    )
+    
+    treatment = DBVariant(
+        id=str(uuid4()),
+        experiment_id=experiment.id,
+        name="Treatment",
+        type=VariantType.TREATMENT,
+        config={"button_color": "green"},
+        traffic_percentage=50.0,
+    )
+    
+    db.add(control)
+    db.add(treatment)
+    
+    # Add metrics
+    metrics = ["conversion_rate", "revenue_per_user"]
+    for metric_name in metrics:
+        metric = ExperimentMetric(experiment_id=experiment.id, metric_name=metric_name)
+        db.add(metric)
+        
+    # Add guardrail metrics
+    guardrail = GuardrailMetric(
+        experiment_id=experiment.id,
+        metric_name="bounce_rate",
+        threshold=10.0,
+        operator=GuardrailOperator.LESS_THAN,
+    )
+    db.add(guardrail)
+    
+    db.commit()
+    logger.info("Created completed A/B test experiment")
+    
+    # Initialize ClickHouse tables
+    data_service = get_data_service()
+    try:
+        data_service.initialize_experiment_tables(experiment.id)
+        logger.info(f"Initialized ClickHouse tables for experiment {experiment.id}")
+    except Exception as e:
+        logger.error(f"Failed to initialize ClickHouse tables: {str(e)}")
+        
+
 async def seed_all(db: Session) -> None:
     """Seed all data."""
     seed_metrics(db)
     seed_features(db)
-    seed_demo_experiment(db)
+    seed_ab_test_experiment(db)
     seed_multivariate_experiment(db)
     seed_feature_flag_experiment(db)
+    seed_running_ab_test_experiment(db)
+    seed_scheduled_ab_test_experiment(db)
+    seed_completed_ab_test_experiment(db)
     logger.info("Database seeding completed")
