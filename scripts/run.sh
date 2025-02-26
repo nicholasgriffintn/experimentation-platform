@@ -41,12 +41,12 @@ docker-compose exec -T api alembic upgrade head
 # Verify services
 echo "Verifying services..."
 
-# Check Iceberg REST API
-echo "Checking Iceberg REST API..."
-if curl -s -f http://localhost:8181/v1/config > /dev/null; then
-    echo "✅ Iceberg REST API is running"
+# Check ClickHouse
+echo "Checking ClickHouse..."
+if curl -s -f http://localhost:8123/ping > /dev/null; then
+    echo "✅ ClickHouse is running"
 else
-    echo "❌ Iceberg REST API is not responding"
+    echo "❌ ClickHouse is not responding"
 fi
 
 # Check Spark
@@ -70,5 +70,5 @@ echo "You can access:"
 echo "- API: http://localhost:8000"
 echo "- MinIO Console: http://localhost:9001"
 echo "- Spark UI: http://localhost:8080"
-echo "- Iceberg REST: http://localhost:8181"
+echo "- ClickHouse HTTP: http://localhost:8123"
 echo "Please start the frontend and api services separately with the command 'pnpm run dev'."

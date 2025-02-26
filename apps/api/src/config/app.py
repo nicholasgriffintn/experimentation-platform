@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     # Database Settings
     database_url: str = "postgresql://postgres:postgres@localhost:5432/experiments"
 
+    # ClickHouse Settings
+    clickhouse_host: str = "localhost"
+    clickhouse_port: int = 9009
+    clickhouse_user: str = "clickhouse"
+    clickhouse_password: str = "clickhouse"
+    clickhouse_database: str = "experiments"
+
     # Security Settings
     secret_key: str = "CHANGE_ME"
     cors_origins: List[str] = [
@@ -25,19 +32,8 @@ class Settings(BaseSettings):
         "http://localhost:3001",  # Alternative dev port
     ]
 
-    # Iceberg Settings
-    iceberg_catalog_name: str = "experimentation"
-    iceberg_rest_uri: str = "http://localhost:8181"
-    iceberg_warehouse: str = "s3://warehouse/iceberg/"
-    iceberg_s3_endpoint: str = "http://localhost:9000"
-    iceberg_s3_access_key: str = "admin"
-    iceberg_s3_secret_key: str = "password"
-    iceberg_catalog_impl: str = "org.apache.iceberg.rest.RESTCatalog"
-    iceberg_io_impl: str = "org.apache.iceberg.aws.s3.S3FileIO"
-    iceberg_namespace: str = "experiments"
-
     # AWS/Storage Settings
-    warehouse_location: str = "s3://warehouse/iceberg/"
+    warehouse_location: str = "s3://warehouse/"
     aws_access_key_id: str = "admin"  # Default for local development
     aws_secret_access_key: str = "password"  # Default for local development
     aws_region: str = "us-east-1"
@@ -54,7 +50,7 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = True
     scheduler_check_interval: int = 60  # seconds
     scheduler_ramp_up_period: int = 24  # hours
-    scheduler_ramp_up_initial_traffic: float = 10.0  # percentage
+    scheduler_ramp_up_initial_traffic: float = 10.0
     scheduler_ramp_up_steps: int = 5
     scheduler_auto_analyze_interval: int = 3600  # 1 hour in seconds
     scheduler_auto_stop_interval: int = 3600  # 1 hour in seconds
@@ -65,26 +61,6 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
-
-    @property
-    def iceberg_catalog_config(self) -> dict:
-        """Get Iceberg catalog configuration."""
-        return {
-            "type": "rest",
-            "uri": self.iceberg_rest_uri,
-            "s3.endpoint": self.iceberg_s3_endpoint,
-            "s3.access-key-id": self.iceberg_s3_access_key,
-            "s3.secret-access-key": self.iceberg_s3_secret_key,
-            "warehouse": self.iceberg_warehouse,
-            "catalog-impl": self.iceberg_catalog_impl,
-            "io-impl": self.iceberg_io_impl,
-            "s3.path-style-access": "true",
-            "region": self.aws_region,
-            "rest.sigv4-enabled": "false",
-            "rest.client.verify-ssl": "false",
-            "rest.client.connect-timeout-ms": "10000",
-            "rest.client.socket-timeout-ms": "10000",
-        }
 
 
 @lru_cache

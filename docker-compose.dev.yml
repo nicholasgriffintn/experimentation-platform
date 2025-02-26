@@ -16,7 +16,6 @@ services:
       - WAREHOUSE_ACCESS_KEY=admin
       - WAREHOUSE_SECRET_KEY=password
       - WAREHOUSE_REGION=us-east-1
-      - ICEBERG_REST_URL=http://experimentation.iceberg:8181
       - DEBUG_MODE=true
     ports:
       - "8000:8000"
@@ -29,8 +28,6 @@ services:
         condition: service_healthy
       warehouse:
         condition: service_healthy
-      rest-iceberg:
-        condition: service_started
 
   frontend:
     build:

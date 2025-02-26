@@ -11,7 +11,7 @@ from ..models.enums import VariantType
 from ..utils.logger import logger
 from .analysis import CombinedAnalysisService
 from .bucketing import BucketingService
-from .data import IcebergDataService
+from .clickhouse_data import ClickHouseDataService
 
 
 class VariantConfig(BaseModel):
@@ -40,7 +40,7 @@ class ExperimentSchedule(BaseModel):
 class ExperimentService:
     def __init__(
         self,
-        data_service: IcebergDataService,
+        data_service: ClickHouseDataService,
         analysis_service: CombinedAnalysisService,
         bucketing_service: Optional[BucketingService] = None,
         cache_service: Optional[Any] = None,

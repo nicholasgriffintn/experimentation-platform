@@ -37,3 +37,33 @@ To rollback migrations:
 alembic downgrade -1  # Rollback one migration
 alembic downgrade base  # Rollback all migrations
 ```
+
+## ClickHouse Management
+
+The platform uses ClickHouse for storing and analyzing experimental data. You can interact with ClickHouse directly using the ClickHouse client:
+
+```bash
+docker exec -it clickhouse-server clickhouse-client
+```
+
+Common ClickHouse commands:
+
+```sql
+SHOW DATABASES;
+
+USE experiments;
+
+SHOW TABLES;
+DESCRIBE TABLE experiments.<experiment_id>_events;
+
+SELECT * FROM experiments.<experiment_id>_events LIMIT 10;
+```
+
+## Testing ClickHouse Connection
+
+To test the connection to ClickHouse, you can run the following script:
+
+```bash
+cd apps/api
+python scripts/test_clickhouse.py
+```

@@ -72,13 +72,10 @@ services:
       /bin/sh -c '
       until mc config host add minio http://warehouse:9000 admin password; do echo "Waiting for MinIO to be ready..."; sleep 1; done;
       mc mb --ignore-existing minio/warehouse;
-      mc mb --ignore-existing minio/warehouse/iceberg;
       mc anonymous set public minio/warehouse;
       mc policy set public minio/warehouse;
-      mc anonymous set public minio/warehouse/iceberg;
-      mc policy set public minio/warehouse/iceberg;
-      echo "test" | mc pipe minio/warehouse/iceberg/test.txt;
-      mc ls minio/warehouse/iceberg;
+      echo "test" | mc pipe minio/warehouse/test.txt;
+      mc ls minio/warehouse;
       tail -f /dev/null
       '
 
@@ -126,25 +123,57 @@ services:
     depends_on:
       - spark-master
 
-  rest-iceberg:
-    image: tabulario/iceberg-rest:latest
+  clickhouse-server:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse-server
+    hostname: clickhouse-server
     networks:
       experimentation_net:
         aliases:
-          - experimentation.iceberg
+          - experimentation.clickhouse
     ports:
-      - "8181:8181"
-    environment:
-      - CATALOG_PROPERTIES=/etc/iceberg/catalog.properties
+      - "8123:8123"
+      - "9009:9000"
     volumes:
-      - ./docker/iceberg-catalog.properties:/etc/iceberg/catalog.properties
+      - clickhouse_data:/var/lib/clickhouse
+      - ./docker/clickhouse/config:/etc/clickhouse-server/config.d
+      - ./docker/clickhouse/users:/etc/clickhouse-server/users.d
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+
+  clickhouse-init:
+    image: clickhouse/clickhouse-client:latest
+    networks:
+      - experimentation_net
     depends_on:
-      warehouse:
+      clickhouse-server:
         condition: service_healthy
+    volumes:
+      - ./docker/clickhouse/init:/docker-entrypoint-initdb.d
+    command: >
+      bash -c '
+      echo "Waiting for ClickHouse to be ready...";
+      sleep 5;
+      echo "Running initialization scripts...";
+      for f in /docker-entrypoint-initdb.d/*.sql; do
+        echo "Executing $f";
+        cat $f | clickhouse-client --host clickhouse-server;
+      done;
+      echo "ClickHouse initialization completed.";
+      '
 
 volumes:
   postgres_data:
   warehouse_data:
+  clickhouse_data:
 
 networks:
   experimentation_net:

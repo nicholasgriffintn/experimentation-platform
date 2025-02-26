@@ -1,7 +1,6 @@
 from functools import lru_cache
 
 from fastapi import Depends
-from pyiceberg.catalog import load_catalog
 from sqlalchemy.orm import Session
 
 from .config.app import settings
@@ -13,16 +12,21 @@ from .services.analysis import (
     StatisticalAnalysisService,
 )
 from .services.cache import CacheService, RedisCache
-from .services.data import IcebergDataService
+from .services.clickhouse_data import ClickHouseDataService
 from .services.experiments import ExperimentService
 from .services.scheduler import ExperimentScheduler
 
 
 @lru_cache
-def get_iceberg_service() -> IcebergDataService:
-    """Get cached IcebergDataService instance."""
-    catalog = load_catalog(settings.iceberg_catalog_name, **settings.iceberg_catalog_config)
-    return IcebergDataService(catalog=catalog)
+def get_clickhouse_service() -> ClickHouseDataService:
+    """Get cached ClickHouseDataService instance."""
+    return ClickHouseDataService(
+        host=settings.clickhouse_host,
+        port=settings.clickhouse_port,
+        user=settings.clickhouse_user,
+        password=settings.clickhouse_password,
+        database=settings.clickhouse_database,
+    )
 
 
 @lru_cache
@@ -67,7 +71,7 @@ def get_cache_service() -> CacheService:
 @lru_cache
 def get_experiment_service(
     db: Session = Depends(get_db),
-    data_service: IcebergDataService = Depends(get_iceberg_service),
+    data_service: ClickHouseDataService = Depends(get_clickhouse_service),
     analysis_service: CombinedAnalysisService = Depends(get_analysis_service),
     cache_service: CacheService = Depends(get_cache_service),
 ) -> ExperimentService:
@@ -77,8 +81,8 @@ def get_experiment_service(
         analysis_service=analysis_service,
         cache_service=cache_service,
         db=db,
+        check_interval=settings.scheduler_check_interval,
     )
-
 
 def get_scheduler(
     experiment_service: ExperimentService = Depends(get_experiment_service),
@@ -86,3 +90,4 @@ def get_scheduler(
 ) -> ExperimentScheduler:
     """Get ExperimentScheduler instance with active database session."""
     return ExperimentScheduler(experiment_service=experiment_service, db=db, check_interval=60)
+
