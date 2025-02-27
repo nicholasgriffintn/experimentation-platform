@@ -151,7 +151,7 @@ async def assign_variant(
     """
     get_active_experiment(experiment_id, db)
 
-    variant = await experiment_service.assign_variant(
+    variant = await experiment_service.resolve_user_variant(
         experiment_id=experiment_id, user_context=user_context.dict()
     )
 
@@ -244,7 +244,7 @@ async def record_metric(
             details={"experiment_id": experiment_id, "metric_name": metric_event.metric_name},
         )
 
-    await experiment_service.record_metric(
+    await experiment_service.track_user_metric(
         experiment_id=experiment_id,
         metric_name=metric_event.metric_name,
         value=metric_event.value,

@@ -105,7 +105,7 @@ class ExperimentService:
 
         return True
 
-    async def assign_variant(
+    async def resolve_user_variant(
         self, experiment_id: str, user_context: Dict, targeting_type: str = "user_id"
     ) -> Optional[Dict[str, Any]]:
         """Assign a variant to a user based on targeting rules"""
@@ -138,7 +138,7 @@ class ExperimentService:
         )
 
         if variant:
-            await self.data_service.assign_variant(
+            await self.data_service.record_variant_assignment(
                 experiment_id=experiment_id,
                 user_id=user_id,
                 variant_id=variant["id"],
@@ -176,7 +176,7 @@ class ExperimentService:
             },
         )
 
-    async def record_metric(
+    async def track_user_metric(
         self,
         experiment_id: str,
         metric_name: str,

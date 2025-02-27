@@ -171,7 +171,7 @@ class DataService:
         query = f"INSERT INTO {self.database}.{table_name} ({columns}) VALUES ({values})"
         self._execute_query(query)
 
-    async def assign_variant(
+    async def record_variant_assignment(
         self, experiment_id: str, user_id: str, variant_id: str, context: Dict
     ) -> None:
         """Record a variant assignment for a user
