@@ -40,6 +40,7 @@ class Experiment(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime)
     stopped_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    last_analyzed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     analysis_method: Mapped[AnalysisMethod] = mapped_column(
         SQLEnum(AnalysisMethod), nullable=False, default=AnalysisMethod.FREQUENTIST

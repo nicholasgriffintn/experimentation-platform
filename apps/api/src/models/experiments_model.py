@@ -52,6 +52,7 @@ class Experiment(ExperimentBase):
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
     stopped_reason: Optional[str] = Field(None, description="Reason for stopping the experiment")
+    last_analyzed_at: Optional[datetime] = Field(None, description="When the experiment was last analyzed")
     variants: List[VariantConfig] = Field(
         default_factory=list, description="List of variants for this experiment"
     )

@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     scheduler_auto_stop_interval: int = 3600  # 1 hour in seconds
     scheduler_auto_stop_delay: int = 60  # seconds
     scheduler_auto_stop_threshold: float = 0.05  # percentage
+    scheduler_analysis_cooldown: int = 1800  # 30 minutes in seconds
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

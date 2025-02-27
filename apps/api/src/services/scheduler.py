@@ -154,6 +154,7 @@ class ExperimentScheduler:
                 setattr(experiment, "status", ExperimentStatus.RUNNING)
 
             setattr(experiment, "started_at", datetime.utcnow())
+            setattr(experiment, "last_analyzed_at", None)
             self.db.commit()
 
             if experiment.parameters.get("auto_analyze_interval"):
@@ -294,6 +295,17 @@ class ExperimentScheduler:
             return
 
         try:
+            now = datetime.utcnow()
+            if experiment.last_analyzed_at:
+                time_since_last_analysis = (now - experiment.last_analyzed_at).total_seconds()
+                if time_since_last_analysis < settings.scheduler_analysis_cooldown:
+                    logger.debug(
+                        f"Skipping analysis for experiment {experiment.id} due to cooldown "
+                        f"(last analyzed {time_since_last_analysis:.1f}s ago, "
+                        f"cooldown: {settings.scheduler_analysis_cooldown}s)"
+                    )
+                    return
+
             if "min_sample_size" in conditions:
                 min_sample_size = int(conditions["min_sample_size"])
                 sample_size = await self._get_experiment_sample_size(experiment)
@@ -303,6 +315,9 @@ class ExperimentScheduler:
 
             if not self.experiment_service:
                 raise ValueError("An experiment service connection is required")
+
+            setattr(experiment, "last_analyzed_at", now)
+            self.db.commit()
 
             results = await self.experiment_service.analyze_results(str(experiment.id))
 
@@ -383,6 +398,7 @@ class ExperimentScheduler:
             setattr(experiment, "status", ExperimentStatus.COMPLETED)
             setattr(experiment, "ended_at", datetime.utcnow())
             setattr(experiment, "stopped_reason", reason)
+            setattr(experiment, "last_analyzed_at", datetime.utcnow())
             self.db.commit()
 
             exp_id = str(experiment.id)
@@ -459,7 +475,23 @@ class ExperimentScheduler:
         async def run_periodic_analysis() -> None:
             while True:
                 await asyncio.sleep(interval)
-                await self.experiment_service.analyze_results(str(experiment.id))
+                
+                now = datetime.utcnow()
+                if experiment.last_analyzed_at:
+                    time_since_last_analysis = (now - experiment.last_analyzed_at).total_seconds()
+                    if time_since_last_analysis < settings.scheduler_analysis_cooldown:
+                        logger.debug(
+                            f"Skipping scheduled analysis for experiment {experiment.id} due to cooldown "
+                            f"(last analyzed {time_since_last_analysis:.1f}s ago, "
+                            f"cooldown: {settings.scheduler_analysis_cooldown}s)"
+                        )
+                        continue
+                
+                exp = self.db.query(Experiment).filter(Experiment.id == experiment.id).first()
+                if exp and exp.status == ExperimentStatus.RUNNING:
+                    setattr(exp, "last_analyzed_at", now)
+                    self.db.commit()
+                    await self.experiment_service.analyze_results(str(experiment.id))
 
         task = asyncio.create_task(run_periodic_analysis())
         self.scheduled_tasks[str(experiment.id)] = task
