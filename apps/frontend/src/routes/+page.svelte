@@ -5,10 +5,10 @@
 	import { metrics } from '$lib/stores/metrics';
 	import { experimentActions } from '$lib/stores/experiments';
 	import { metricActions } from '$lib/stores/metrics';
-	import StatsCard from '$lib/components/common/StatsCard.svelte';
 	import SummaryList from '$lib/components/common/SummaryList.svelte';
 	import ExperimentSummary from '$lib/components/dashboard/ExperimentSummary.svelte';
 	import MetricSummary from '$lib/components/dashboard/MetricSummary.svelte';
+	import ExperimentVelocityCharts from '$lib/components/dashboard/ExperimentVelocityCharts.svelte';
 
 	let showWelcomeBanner = false;
 
@@ -60,26 +60,11 @@
 		</div>
 	{/if}
 
-	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-		<StatsCard
-			title="Total Experiments"
-			value={$experiments.length}
-		/>
-		<StatsCard
-			title="Active Experiments"
-			value={$activeExperiments.length}
-			valueColor="text-green-600"
-		/>
-		<StatsCard
-			title="Completed Experiments"
-			value={$completedExperiments.length}
-			valueColor="text-blue-600"
-		/>
-		<StatsCard
-			title="Available Metrics"
-			value={$metrics.length}
-		/>
-	</div>
+	{#if $experiments.length > 0}
+		<div class="mb-8">
+			<ExperimentVelocityCharts />
+		</div>
+	{/if}
 
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
 		<SummaryList
