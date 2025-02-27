@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+
 	import { experiments, activeExperiments, completedExperiments } from '$lib/stores/experiments';
 	import { metrics } from '$lib/stores/metrics';
 	import { experimentActions } from '$lib/stores/experiments';
 	import { metricActions } from '$lib/stores/metrics';
-	import StatsCard from '../components/common/StatsCard.svelte';
-	import SummaryList from '../components/common/SummaryList.svelte';
-	import ExperimentSummary from '../components/dashboard/ExperimentSummary.svelte';
-	import MetricSummary from '../components/dashboard/MetricSummary.svelte';
+	import StatsCard from '$lib/components/common/StatsCard.svelte';
+	import SummaryList from '$lib/components/common/SummaryList.svelte';
+	import ExperimentSummary from '$lib/components/dashboard/ExperimentSummary.svelte';
+	import MetricSummary from '$lib/components/dashboard/MetricSummary.svelte';
 
 	let showWelcomeBanner = false;
 
