@@ -47,7 +47,7 @@ def seed_metrics(db: Session) -> None:
             SELECT
                 variant_id,
                 COUNT(DISTINCT CASE WHEN event_type = 'conversion' THEN user_id END) / COUNT(DISTINCT user_id) AS value
-            FROM {experiment_id}_events
+            FROM experiments.events
             WHERE timestamp BETWEEN '{start_date}' AND '{end_date}'
             GROUP BY variant_id
             """,
@@ -62,7 +62,7 @@ def seed_metrics(db: Session) -> None:
             SELECT
                 variant_id,
                 SUM(event_value) / COUNT(DISTINCT user_id) AS value
-            FROM {experiment_id}_events
+            FROM experiments.events
             WHERE event_type = 'purchase' AND timestamp BETWEEN '{start_date}' AND '{end_date}'
             GROUP BY variant_id
             """,
@@ -77,7 +77,7 @@ def seed_metrics(db: Session) -> None:
             SELECT
                 variant_id,
                 AVG(event_value) AS value
-            FROM {experiment_id}_events
+            FROM experiments.events
             WHERE event_type = 'session_end' AND timestamp BETWEEN '{start_date}' AND '{end_date}'
             GROUP BY variant_id
             """,
@@ -92,7 +92,7 @@ def seed_metrics(db: Session) -> None:
             SELECT
                 variant_id,
                 COUNT(DISTINCT CASE WHEN event_type = 'click' THEN user_id END) / COUNT(DISTINCT user_id) AS value
-            FROM {experiment_id}_events
+            FROM experiments.events
             WHERE timestamp BETWEEN '{start_date}' AND '{end_date}'
             GROUP BY variant_id
             """,
@@ -107,7 +107,7 @@ def seed_metrics(db: Session) -> None:
             SELECT
                 variant_id,
                 COUNT(DISTINCT CASE WHEN event_type = 'bounce' THEN user_id END) / COUNT(DISTINCT user_id) AS value
-            FROM {experiment_id}_events
+            FROM experiments.events
             WHERE timestamp BETWEEN '{start_date}' AND '{end_date}'
             GROUP BY variant_id
             """,
@@ -122,7 +122,7 @@ def seed_metrics(db: Session) -> None:
             SELECT
                 variant_id,
                 COUNT(CASE WHEN event_type = 'page_view' THEN 1 END) / COUNT(DISTINCT user_id) AS value
-            FROM {experiment_id}_events
+            FROM experiments.events
             WHERE timestamp BETWEEN '{start_date}' AND '{end_date}'
             GROUP BY variant_id
             """,
@@ -137,7 +137,7 @@ def seed_metrics(db: Session) -> None:
             SELECT
                 variant_id,
                 COUNT(DISTINCT CASE WHEN event_type = 'add_to_cart' THEN user_id END) / COUNT(DISTINCT user_id) AS value
-            FROM {experiment_id}_events
+            FROM experiments.events
             WHERE timestamp BETWEEN '{start_date}' AND '{end_date}'
             GROUP BY variant_id
             """,
