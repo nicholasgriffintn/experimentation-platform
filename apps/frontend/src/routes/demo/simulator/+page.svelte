@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import Button from "../../../components/common/Button.svelte";
-  import FormLayout from "../../../components/common/FormLayout.svelte";
-  import { ExperimentsAPI } from "../../../lib/api";
-  import type { Experiment, UserContext, VariantAssignment } from "../../../types/api";
+
+  import Button from "$lib/components/common/Button.svelte";
+  import FormLayout from "$lib/components/common/FormLayout.svelte";
+  import { ExperimentsAPI } from "$lib/api";
+  import type { Experiment, VariantAssignment } from "$lib/types/api";
 
   const api = new ExperimentsAPI();
 

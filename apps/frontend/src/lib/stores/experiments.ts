@@ -1,6 +1,6 @@
 import { writable, derived } from 'svelte/store';
 
-import type { Experiment, ExperimentResults, ExperimentCreate, ExperimentSchedule } from '../../types/api';
+import type { Experiment, ExperimentResults, ExperimentCreate, ExperimentSchedule } from '../types/api';
 import { api } from '../api';
 
 export const experiments = writable<Experiment[]>([]);

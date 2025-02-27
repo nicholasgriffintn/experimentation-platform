@@ -2,9 +2,9 @@
     import { goto } from '$app/navigation';
     import { loading, error, metricActions } from '$lib/stores/metrics';
     import type { PageData } from './$types';
-    import type { MetricDefinition } from '../../../types/api';
-    import MetricForm from '../../../components/metrics/MetricForm.svelte';
-    import Button from '../../../components/common/Button.svelte';
+    import type { MetricDefinition } from '$lib/types/api';
+    import MetricForm from '$lib/components/metrics/MetricForm.svelte';
+    import Button from '$lib/components/common/Button.svelte';
 
     export let data: PageData;
     $: metric = data.metric as MetricDefinition;

@@ -1,9 +1,9 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
     import { loading, error, metricActions } from '$lib/stores/metrics';
-    import MetricForm from '../../../components/metrics/MetricForm.svelte';
-    import FormLayout from '../../../components/common/FormLayout.svelte';
-    import type { MetricDefinition } from '../../../types/api';
+    import MetricForm from '$lib/components/metrics/MetricForm.svelte';
+    import FormLayout from '$lib/components/common/FormLayout.svelte';
+    import type { MetricDefinition } from '$lib/types/api';
 
     async function handleSubmit(event: CustomEvent<MetricDefinition>) {
         try {

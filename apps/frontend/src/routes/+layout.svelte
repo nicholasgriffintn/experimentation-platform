@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.postcss';
 	import { page } from '$app/stores';
-	import NavLink from '../components/common/NavLink.svelte';
+	import NavLink from '$lib/components/common/NavLink.svelte';
 </script>
 
 <div class="min-h-screen bg-gray-50">

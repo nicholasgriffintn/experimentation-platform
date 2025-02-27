@@ -1,11 +1,12 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+
 	import { goto } from '$app/navigation';
 	import { metricActions } from '$lib/stores/metrics';
 	import { loading, error, experimentActions } from '$lib/stores/experiments';
-	import ExperimentForm from '../../../components/experiments/ExperimentForm.svelte';
-	import FormLayout from '../../../components/common/FormLayout.svelte';
-	import type { ExperimentCreate } from '../../../types/api';
-	import { onMount } from 'svelte';
+	import ExperimentForm from '$lib/components/experiments/ExperimentForm.svelte';
+	import FormLayout from '$lib/components/common/FormLayout.svelte';
+	import type { ExperimentCreate } from '$lib/types/api';
 
 	onMount(() => {
 		metricActions.loadMetrics();

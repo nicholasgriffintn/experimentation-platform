@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ResourceCard from "../../components/common/ResourceCard.svelte";
+  import ResourceCard from "$lib/components/common/ResourceCard.svelte";
 </script>
 
 <div class="container mx-auto px-4 py-8">

@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { FeatureDefinition } from '../../types/api';
+import type { FeatureDefinition } from '../types/api';
 import { featuresApi } from '$lib/api/features';
 
 function createFeatureStore() {

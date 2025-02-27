@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+
 	import type { PageData } from './$types';
 	import { experimentResults, loading, error, experimentActions } from '$lib/stores/experiments';
-	import type { Experiment, ExperimentSchedule } from '../../../types/api';
-	import Button from '../../../components/common/Button.svelte';
-	import CardLink from '../../../components/common/CardLink.svelte';
-	import StatusBadge from '../../../components/common/StatusBadge.svelte';
-	import Dialog from '../../../components/common/Dialog.svelte';
+	import type { Experiment, ExperimentSchedule } from '$lib/types/api';
+	import Button from '$lib/components/common/Button.svelte';
+	import CardLink from '$lib/components/common/CardLink.svelte';
+	import StatusBadge from '$lib/components/common/StatusBadge.svelte';
+	import Dialog from '$lib/components/common/Dialog.svelte';
 
 	export let data: PageData;
 	$: experiment = data.experiment as Experiment;
@@ -152,6 +153,28 @@
 							<strong>Hypothesis:</strong> {experiment.hypothesis}
 						</p>
 					{/if}
+					<div class="mt-4 grid grid-cols-2 gap-4 text-sm">
+						<div>
+							<span class="font-medium">Type:</span>
+							<span class="ml-2 capitalize">{experiment.type.replace('_', ' ')}</span>
+						</div>
+						<div>
+							<span class="font-medium">Created:</span>
+							<span class="ml-2">{new Date(experiment.created_at).toLocaleString()}</span>
+						</div>
+						{#if experiment.started_at}
+							<div>
+								<span class="font-medium">Started:</span>
+								<span class="ml-2">{new Date(experiment.started_at).toLocaleString()}</span>
+							</div>
+						{/if}
+						{#if experiment.ended_at}
+							<div>
+								<span class="font-medium">Ended:</span>
+								<span class="ml-2">{new Date(experiment.ended_at).toLocaleString()}</span>
+							</div>
+						{/if}
+					</div>
 				</div>
 				<div class="flex items-center space-x-4">
 					<StatusBadge status={status} size="md" />
@@ -211,6 +234,28 @@
 				</div>
 
 				<div class="space-y-8">
+					<div class="bg-white p-6 rounded-lg shadow">
+						<h2 class="text-xl font-semibold mb-4">Audience Targeting</h2>
+						{#if experiment.targeting_rules && Object.keys(experiment.targeting_rules).length > 0}
+							<div class="space-y-4">
+								{#each Object.entries(experiment.targeting_rules) as [key, value]}
+									<div class="flex flex-col">
+										<span class="font-medium capitalize">{key.replace('_', ' ')}:</span>
+										<div class="mt-1 text-gray-600">
+											{#if Array.isArray(value)}
+												{value.join(', ')}
+											{:else}
+												{value}
+											{/if}
+										</div>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<p class="text-gray-600">No targeting rules configured</p>
+						{/if}
+					</div>
+
 					{#if experiment.schedule}
 						<div class="bg-white p-6 rounded-lg shadow">
 							<div class="flex justify-between items-center mb-4">
@@ -253,6 +298,20 @@
 										<span class="font-medium">Traffic Allocation:</span>
 										<div class="mt-1 text-gray-600">
 										{experiment.traffic_allocation.toFixed(1)}% of eligible traffic
+										</div>
+									</div>
+								{/if}
+								{#if experiment.schedule.auto_stop_conditions && Object.keys(experiment.schedule.auto_stop_conditions).length > 0}
+									<div>
+										<span class="font-medium">Auto-Stop Conditions:</span>
+										<div class="mt-1 text-gray-600">
+											<ul class="list-disc list-inside">
+												{#each Object.entries(experiment.schedule.auto_stop_conditions) as [key, value]}
+													<li>
+														<span class="capitalize">{key.replace(/_/g, ' ')}:</span> {value}
+													</li>
+												{/each}
+											</ul>
 										</div>
 									</div>
 								{/if}
@@ -386,6 +445,75 @@
 				<div class="bg-white p-6 rounded-lg shadow">
 					<h2 class="text-xl font-semibold mb-4">Stop Reason</h2>
 					<p class="text-gray-600">{experiment.stopped_reason}</p>
+				</div>
+			{/if}
+
+			{#if experiment.analysis_config}
+				<div class="bg-white p-6 rounded-lg shadow">
+					<h2 class="text-xl font-semibold mb-4">Analysis Configuration</h2>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+						<div>
+							<h3 class="text-lg font-medium mb-3">General Settings</h3>
+							<div class="space-y-3">
+								<div class="flex justify-between">
+									<span class="font-medium">Method:</span>
+									<span class="text-gray-600 capitalize">{experiment.analysis_config.method}</span>
+								</div>
+								<div class="flex justify-between">
+									<span class="font-medium">Confidence Level:</span>
+									<span class="text-gray-600">{experiment.analysis_config.confidence_level * 100}%</span>
+								</div>
+								<div class="flex justify-between">
+									<span class="font-medium">Correction Method:</span>
+									<span class="text-gray-600 capitalize">{experiment.analysis_config.correction_method.replace('_', ' ')}</span>
+								</div>
+								<div class="flex justify-between">
+									<span class="font-medium">Sequential Testing:</span>
+									<span class="text-gray-600">{experiment.analysis_config.sequential_testing ? 'Yes' : 'No'}</span>
+								</div>
+								{#if experiment.analysis_config.stopping_threshold}
+									<div class="flex justify-between">
+										<span class="font-medium">Stopping Threshold:</span>
+										<span class="text-gray-600">{experiment.analysis_config.stopping_threshold}</span>
+									</div>
+								{/if}
+							</div>
+						</div>
+						
+						<div>
+							<h3 class="text-lg font-medium mb-3">Default Metric Configuration</h3>
+							<div class="space-y-3">
+								<div class="flex justify-between">
+									<span class="font-medium">Min Sample Size:</span>
+									<span class="text-gray-600">{experiment.analysis_config.default_metric_config.min_sample_size}</span>
+								</div>
+								<div class="flex justify-between">
+									<span class="font-medium">Min Effect Size:</span>
+									<span class="text-gray-600">{experiment.analysis_config.default_metric_config.min_effect_size}</span>
+								</div>
+							</div>
+							
+							{#if experiment.analysis_config.method === 'bayesian' && experiment.analysis_config.prior_successes !== undefined && experiment.analysis_config.prior_trials !== undefined}
+								<h3 class="text-lg font-medium mt-6 mb-3">Bayesian Settings</h3>
+								<div class="space-y-3">
+									<div class="flex justify-between">
+										<span class="font-medium">Prior Successes:</span>
+										<span class="text-gray-600">{experiment.analysis_config.prior_successes}</span>
+									</div>
+									<div class="flex justify-between">
+										<span class="font-medium">Prior Trials:</span>
+										<span class="text-gray-600">{experiment.analysis_config.prior_trials}</span>
+									</div>
+									{#if experiment.analysis_config.num_samples}
+										<div class="flex justify-between">
+											<span class="font-medium">Number of Samples:</span>
+											<span class="text-gray-600">{experiment.analysis_config.num_samples}</span>
+										</div>
+									{/if}
+								</div>
+							{/if}
+						</div>
+					</div>
 				</div>
 			{/if}
 		</div>
