@@ -14,18 +14,18 @@ from ..db.base import Variant as DBVariant
 from ..db.session import get_db
 from ..dependencies import get_experiment_service
 from ..middleware.error_handler import ResourceNotFoundError, ValidationError
-from ..models.experiments_model import Experiment as ExperimentModel
-from ..models.experiments_model import (
+from ..services.experiments import ExperimentService
+from ..types import Experiment as ExperimentModel
+from ..types import (
     ExperimentCreate,
     ExperimentResults,
     ExperimentSchedule,
     ExperimentStatus,
     ExperimentType,
+    MetricEvent,
+    UserContext,
+    VariantAssignment,
 )
-from ..models.metrics_model import MetricEvent
-from ..models.user_model import UserContext
-from ..models.variants_model import VariantAssignment
-from ..services.experiments import ExperimentService
 
 router = APIRouter()
 

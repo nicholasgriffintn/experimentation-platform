@@ -6,7 +6,7 @@ class SystemMetricsService:
     Centralized service for collecting and managing system metrics.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._metrics: Dict[str, Dict[str, Any]] = {}
 
     def increment(self, service: str, metric: str, value: int = 1) -> None:

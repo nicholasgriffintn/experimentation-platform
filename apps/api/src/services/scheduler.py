@@ -7,12 +7,10 @@ from sqlalchemy.orm import Session
 
 from ..config.app import settings
 from ..db.base import Experiment
-from ..models.analysis_model import AnalysisMethod
-from ..models.experiments_model import ExperimentStatus
-from ..models.guardrails_model import GuardrailMetric, GuardrailOperator
+from ..types import AnalysisMethod, ExperimentStatus, GuardrailMetric, GuardrailOperator
 from ..utils.logger import logger
-from .experiments import ExperimentService
 from .data import DataService
+from .experiments import ExperimentService
 from .system_metrics import system_metrics
 
 
@@ -76,11 +74,15 @@ class ExperimentScheduler:
 
             experiments = (
                 self.db.query(Experiment)
-                .filter(Experiment.status.in_([
-                    ExperimentStatus.DRAFT,
-                    ExperimentStatus.RUNNING,
-                    ExperimentStatus.SCHEDULED,
-                ]))
+                .filter(
+                    Experiment.status.in_(
+                        [
+                            ExperimentStatus.DRAFT,
+                            ExperimentStatus.RUNNING,
+                            ExperimentStatus.SCHEDULED,
+                        ]
+                    )
+                )
                 .all()
             )
 
@@ -90,8 +92,7 @@ class ExperimentScheduler:
                     and experiment.start_time
                     and experiment.start_time <= now
                 ) or (
-                    experiment.status == ExperimentStatus.SCHEDULED
-                    and experiment.start_time <= now
+                    experiment.status == ExperimentStatus.SCHEDULED and experiment.start_time <= now
                 ):
                     await self.start_experiment(experiment)
 
@@ -235,9 +236,7 @@ class ExperimentScheduler:
             if not self.data_service:
                 raise ValueError("A data service connection is required")
 
-            exposure_data = await self.data_service.get_exposure_data(
-                str(experiment.id)
-            )
+            exposure_data = await self.data_service.get_exposure_data(str(experiment.id))
             if not exposure_data:
                 return 0
 
@@ -387,13 +386,13 @@ class ExperimentScheduler:
         """Gracefully stops an experiment and runs final analysis"""
         try:
             logger.info(f"Stopping experiment {experiment.id}")
-            
+
             if not self.data_service:
                 raise ValueError("A data service connection is required")
-            
+
             if not self.experiment_service:
                 raise ValueError("An experiment service connection is required")
-            
+
             system_metrics.increment("scheduler", "stop_experiment")
             setattr(experiment, "status", ExperimentStatus.COMPLETED)
             setattr(experiment, "ended_at", datetime.utcnow())
@@ -445,10 +444,10 @@ class ExperimentScheduler:
         self, experiment: Experiment, guardrail: GuardrailMetric
     ) -> None:
         """Handle a guardrail violation"""
-        
+
         if not self.data_service:
             raise ValueError("A data service connection is required")
-        
+
         reason = f"Guardrail violation: {guardrail.metric_name} {guardrail.operator} {guardrail.threshold}"
         await self.stop_experiment(experiment, reason=reason)
 
@@ -475,7 +474,7 @@ class ExperimentScheduler:
         async def run_periodic_analysis() -> None:
             while True:
                 await asyncio.sleep(interval)
-                
+
                 now = datetime.utcnow()
                 if experiment.last_analyzed_at:
                     time_since_last_analysis = (now - experiment.last_analyzed_at).total_seconds()
@@ -486,7 +485,7 @@ class ExperimentScheduler:
                             f"cooldown: {settings.scheduler_analysis_cooldown}s)"
                         )
                         continue
-                
+
                 exp = self.db.query(Experiment).filter(Experiment.id == experiment.id).first()
                 if exp and exp.status == ExperimentStatus.RUNNING:
                     setattr(exp, "last_analyzed_at", now)

@@ -5,7 +5,7 @@ import numpy as np
 from scipy import stats
 from scipy.stats import chi2_contingency, mannwhitneyu, ttest_ind
 
-from ...models.metrics_model import MetricType
+from ...types import MetricType
 
 
 @dataclass

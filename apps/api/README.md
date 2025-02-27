@@ -44,7 +44,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 5. Install dependencies:
 
 ```bash
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 6. Create a `.env` file based on `.env.example`:

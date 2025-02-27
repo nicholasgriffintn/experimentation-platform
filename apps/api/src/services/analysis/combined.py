@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from ...models.enums import MetricType
+from ...types import MetricType
 from .bayesian import BayesianAnalysisService
 from .correction import MultipleTestingCorrection
 from .frequentist import ExperimentResult, StatisticalAnalysisService

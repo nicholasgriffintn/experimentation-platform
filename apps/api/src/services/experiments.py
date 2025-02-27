@@ -1,13 +1,12 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional, cast
+
 import pandas as pd
 import pyarrow as pa
-        
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..models.analysis_model import AnalysisMethod, CorrectionMethod
-from ..models.enums import VariantType
+from ..types import AnalysisMethod, CorrectionMethod, VariantType
 from ..utils.logger import logger
 from .analysis import CombinedAnalysisService
 from .bucketing import BucketingService
@@ -83,7 +82,7 @@ class ExperimentService:
             config = await self.cache_service.get_experiment_config(experiment_id)
             if config:
                 return cast(Dict[str, Any], config)
-            
+
         if not self.data_service:
             raise ValueError("A data service connection is required")
 
@@ -91,7 +90,7 @@ class ExperimentService:
 
     async def initialize_experiment(self, experiment_id: str, config: Dict) -> bool:
         """Initialize a new experiment with the given configuration
-        
+
         Args:
             experiment_id: The unique identifier for the experiment
             config: The experiment configuration
@@ -207,7 +206,7 @@ class ExperimentService:
         """Analyze current experiment results with multiple testing correction"""
         logger.info(f"Analyzing results for experiment {experiment_id}")
         config = await self._get_experiment_config(experiment_id)
-        
+
         if metrics:
             metrics_to_analyze = metrics
         else:
@@ -270,11 +269,13 @@ class ExperimentService:
                 method = analysis_config.get("method", AnalysisMethod.FREQUENTIST)
                 sequential = analysis_config.get("sequential_testing", False)
                 stopping_threshold = analysis_config.get("stopping_threshold", 0.01)
-                
+
                 # Find metric type from config
                 metric_type = "continuous"  # default
                 for m in config.get("metrics", []):
-                    if isinstance(m, dict) and (m.get("metric_name") == metric_name or m.get("name") == metric_name):
+                    if isinstance(m, dict) and (
+                        m.get("metric_name") == metric_name or m.get("name") == metric_name
+                    ):
                         metric_type = m.get("type", "continuous")
                         break
 
@@ -285,7 +286,9 @@ class ExperimentService:
                         metric_name=metric_name,
                         metric_type=metric_type,
                         alpha=config.get("analysis_config", {}).get("alpha", 0.05),
-                        correction_method=config.get("analysis_config", {}).get("correction_method"),
+                        correction_method=config.get("analysis_config", {}).get(
+                            "correction_method"
+                        ),
                         method=method,
                         sequential=sequential,
                         stopping_threshold=stopping_threshold,
@@ -314,7 +317,9 @@ class ExperimentService:
                             stats=metrics_results[metric_name],
                         )
                 except Exception as e:
-                    logger.error(f"Error analyzing metric {metric_name} for variant {variant_id}: {str(e)}")
+                    logger.error(
+                        f"Error analyzing metric {metric_name} for variant {variant_id}: {str(e)}"
+                    )
                     metrics_results[metric_name][variant_id] = {
                         "sample_size": len(variant_data),
                         "mean": float(sum(variant_data) / len(variant_data)) if variant_data else 0,
@@ -372,19 +377,19 @@ class ExperimentService:
 
         try:
             if isinstance(metric_history, pa.ChunkedArray):
-                table = pa.Table.from_arrays([metric_history], names=['data'])
+                table = pa.Table.from_arrays([metric_history], names=["data"])
                 df = table.to_pandas()
             elif isinstance(metric_history, pa.Table):
                 df = metric_history.to_pandas()
             else:
                 df = pd.DataFrame(metric_history)
 
-            if 'variant_id' not in df.columns or 'metric_value' not in df.columns:
+            if "variant_id" not in df.columns or "metric_value" not in df.columns:
                 return {}
 
             grouped_data = {}
-            for variant_id, group in df.groupby('variant_id'):
-                grouped_data[variant_id] = group['metric_value'].tolist()
+            for variant_id, group in df.groupby("variant_id"):
+                grouped_data[variant_id] = group["metric_value"].tolist()
             return grouped_data
 
         except Exception:
@@ -412,7 +417,7 @@ class ExperimentService:
         if config:
             config["status"] = "stopped"
             config["stopped_reason"] = reason
-            
+
             await self.data_service.set_experiment_config(experiment_id, config)
 
             if self.cache_service:
@@ -429,29 +434,31 @@ class ExperimentService:
             config = await self._get_experiment_config(experiment_id)
             if config:
                 config["schedule"] = schedule
-                
+
                 await self.data_service.set_experiment_config(experiment_id, config)
-                
+
                 if self.cache_service:
                     await self.cache_service.set_experiment_config(experiment_id, config)
-                    
-    async def get_results(self, experiment_id: str, metrics: Optional[List[str]] = None) -> Dict[str, Any]:
+
+    async def get_results(
+        self, experiment_id: str, metrics: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
         """Get the most recent results for an experiment
-        
+
         This method first tries to retrieve stored results from the database.
         If no stored results exist, it performs a new analysis.
-        
+
         Args:
             experiment_id: ID of the experiment
             metrics: Optional list of specific metrics to analyze
-            
+
         Returns:
             Dictionary with experiment results
         """
         logger.info(f"Getting results for experiment {experiment_id}")
-        
+
         stored_results = await self.data_service.get_stored_results(experiment_id)
-        
+
         if stored_results:
             logger.info(f"Using stored results for experiment {experiment_id}")
             if metrics and stored_results.get("metrics"):
@@ -461,6 +468,8 @@ class ExperimentService:
                         filtered_metrics[metric_name] = stored_results["metrics"][metric_name]
                 stored_results["metrics"] = filtered_metrics
             return stored_results
-            
-        logger.info(f"No stored results found for experiment {experiment_id}, performing new analysis")
+
+        logger.info(
+            f"No stored results found for experiment {experiment_id}, performing new analysis"
+        )
         return await self.analyze_results(experiment_id=experiment_id, metrics=metrics)

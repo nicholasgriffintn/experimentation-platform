@@ -1,12 +1,17 @@
+"""
+Metric models for experiments.
+"""
+
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
-from .enums import MetricType
-from .user_model import UserContext
+from ..common import MetricType, UserContext
 
 
 class MetricEvent(BaseModel):
+    """Event data for a metric."""
+
     metric_name: str
     value: float
     user_context: UserContext
@@ -14,6 +19,8 @@ class MetricEvent(BaseModel):
 
 
 class MetricDefinition(BaseModel):
+    """Definition of a metric."""
+
     name: str = Field(..., description="Name of the metric")
     description: Optional[str] = Field(None, description="Description of what the metric measures")
     unit: Optional[str] = Field(None, description="Unit of measurement (e.g., '%', 'count', '$')")
@@ -28,6 +35,8 @@ class MetricDefinition(BaseModel):
 
 
 class MetricConfig(BaseModel):
+    """Configuration for a metric in an experiment."""
+
     name: str = Field(..., description="Name of the metric")
     type: MetricType = Field(..., description="Type of metric")
     min_sample_size: int = Field(..., description="Minimum sample size required")

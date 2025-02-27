@@ -1,12 +1,18 @@
+"""
+Variant models for experiments.
+"""
+
 from typing import Any, Dict
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from .enums import VariantType
+from ..common import VariantType
 
 
 class VariantConfig(BaseModel):
+    """Configuration for a variant in an experiment."""
+
     id: str = Field(
         default_factory=lambda: str(uuid4()), description="Unique identifier for the variant"
     )
@@ -19,6 +25,8 @@ class VariantConfig(BaseModel):
 
 
 class VariantAssignment(BaseModel):
+    """Assignment of a user to a variant in an experiment."""
+
     experiment_id: str
     variant_id: str
     variant_name: str

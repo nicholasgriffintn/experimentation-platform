@@ -6,8 +6,7 @@ from sqlalchemy.orm import Session
 from ..db.base import MetricDefinition as DBMetricDefinition
 from ..db.session import get_db
 from ..middleware.error_handler import ResourceNotFoundError, ValidationError
-from ..models.enums import MetricType
-from ..models.metrics_model import MetricDefinition
+from ..types import MetricDefinition, MetricType
 
 router = APIRouter()
 

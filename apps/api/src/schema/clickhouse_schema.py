@@ -75,4 +75,4 @@ class ClickHouseSchemas:
         PARTITION BY (experiment_id, metric_name)
         ORDER BY (experiment_id, metric_name, timestamp)
         SETTINGS index_granularity = 8192
-        """ 
+        """

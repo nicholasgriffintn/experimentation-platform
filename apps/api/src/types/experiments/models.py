@@ -1,34 +1,23 @@
+"""
+Main experiment models.
+"""
+
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, model_validator
 
-from .analysis_model import AnalysisConfig, MetricResult
-from .enums import ExperimentStatus, ExperimentType
-from .guardrails_model import GuardrailConfig
-from .variants_model import VariantConfig
-
-
-class ExperimentBase(BaseModel):
-    name: str = Field(..., description="Name of the experiment")
-    description: str = Field(..., description="Description of what the experiment is testing")
-    type: ExperimentType = Field(..., description="Type of experiment")
-    hypothesis: Optional[str] = Field(None, description="What is being tested")
-    parameters: Dict[str, Any] = Field(default_factory=dict)
-    targeting_rules: Dict[str, Any] = Field(
-        default_factory=dict, description="Rules for targeting specific users"
-    )
-
-
-class ExperimentSchedule(BaseModel):
-    start_time: datetime
-    end_time: Optional[datetime] = None
-    ramp_up_period: Optional[int] = Field(None, description="Ramp up period in hours")
-    auto_stop_conditions: Optional[Dict[str, Any]] = None
+from ..analysis import AnalysisConfig, MetricResult
+from ..common import ExperimentStatus
+from .base import ExperimentBase, ExperimentSchedule
+from .guardrails import GuardrailConfig
+from .variants import VariantConfig
 
 
 class ExperimentCreate(ExperimentBase):
+    """Model for creating a new experiment."""
+
     variants: List[VariantConfig] = Field(..., description="Variant configurations")
     metrics: List[str] = Field(..., description="Metrics being measured")
     guardrail_metrics: Optional[List[GuardrailConfig]] = None
@@ -40,6 +29,8 @@ class ExperimentCreate(ExperimentBase):
 
 
 class Experiment(ExperimentBase):
+    """Model for an experiment."""
+
     id: str = Field(
         default_factory=lambda: str(uuid4()), description="Unique identifier for the experiment"
     )
@@ -52,7 +43,9 @@ class Experiment(ExperimentBase):
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
     stopped_reason: Optional[str] = Field(None, description="Reason for stopping the experiment")
-    last_analyzed_at: Optional[datetime] = Field(None, description="When the experiment was last analyzed")
+    last_analyzed_at: Optional[datetime] = Field(
+        None, description="When the experiment was last analyzed"
+    )
     variants: List[VariantConfig] = Field(
         default_factory=list, description="List of variants for this experiment"
     )
@@ -70,6 +63,7 @@ class Experiment(ExperimentBase):
     @model_validator(mode="before")
     @classmethod
     def convert_variants(cls, data: Any) -> Any:
+        """Convert database model to Pydantic model."""
         if hasattr(data, "__dict__"):
             data_dict = data.__dict__
 
@@ -118,6 +112,8 @@ class Experiment(ExperimentBase):
 
 
 class ExperimentResults(BaseModel):
+    """Model for experiment results."""
+
     experiment_id: str
     status: ExperimentStatus
     start_time: datetime

@@ -6,8 +6,9 @@ from sqlalchemy import Enum as SQLEnum
 from sqlalchemy import Float, ForeignKey, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from ..models.analysis_model import AnalysisMethod, CorrectionMethod
-from ..models.experiments_model import (
+from ..types import (
+    AnalysisMethod,
+    CorrectionMethod,
     ExperimentStatus,
     ExperimentType,
 )

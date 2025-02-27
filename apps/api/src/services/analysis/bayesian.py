@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
-from ...models.metrics_model import MetricType
+from ...types import MetricType
 
 
 class BayesianAnalysisService:

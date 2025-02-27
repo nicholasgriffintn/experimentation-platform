@@ -4,10 +4,14 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from ..models.analysis_model import AnalysisMethod, CorrectionMethod
-from ..models.experiments_model import ExperimentStatus, ExperimentType
-from ..models.guardrails_model import GuardrailOperator
-from ..models.variants_model import VariantType
+from ..types import (
+    AnalysisMethod,
+    CorrectionMethod,
+    ExperimentStatus,
+    ExperimentType,
+    GuardrailOperator,
+    VariantType,
+)
 from ..utils.logger import logger
 from .base import Experiment as DBExperiment
 from .base import ExperimentMetric, FeatureDefinition, GuardrailMetric, MetricDefinition
@@ -205,7 +209,9 @@ def seed_features(db: Session) -> None:
 
     for feature_data in features:
         feature = (
-            db.query(FeatureDefinition).filter(FeatureDefinition.name == feature_data["name"]).first()
+            db.query(FeatureDefinition)
+            .filter(FeatureDefinition.name == feature_data["name"])
+            .first()
         )
         if not feature:
             feature = FeatureDefinition(**feature_data)
@@ -217,9 +223,7 @@ def seed_features(db: Session) -> None:
 
 async def seed_ab_test_experiment(db: Session) -> None:
     """Seed an A/B test experiment."""
-    experiment = (
-        db.query(DBExperiment).filter(DBExperiment.name == "Simple A/B Test").first()
-    )
+    experiment = db.query(DBExperiment).filter(DBExperiment.name == "Simple A/B Test").first()
 
     if experiment:
         logger.info("A/B test experiment already exists, skipping")
@@ -296,9 +300,7 @@ async def seed_ab_test_experiment(db: Session) -> None:
 
 async def seed_multivariate_experiment(db: Session) -> None:
     """Seed a multivariate test experiment."""
-    experiment = (
-        db.query(DBExperiment).filter(DBExperiment.name == "Multivariate Test").first()
-    )
+    experiment = db.query(DBExperiment).filter(DBExperiment.name == "Multivariate Test").first()
 
     if experiment:
         logger.info("Multivariate experiment already exists, skipping")
@@ -385,9 +387,7 @@ async def seed_multivariate_experiment(db: Session) -> None:
 
 async def seed_feature_flag_experiment(db: Session) -> None:
     """Seed a feature flag experiment."""
-    experiment = (
-        db.query(DBExperiment).filter(DBExperiment.name == "Feature Flag Test").first()
-    )
+    experiment = db.query(DBExperiment).filter(DBExperiment.name == "Feature Flag Test").first()
 
     if experiment:
         logger.info("Feature flag experiment already exists, skipping")
@@ -463,14 +463,12 @@ async def seed_feature_flag_experiment(db: Session) -> None:
 
 async def seed_running_ab_test_experiment(db: Session) -> None:
     """Seed a running A/B test experiment."""
-    experiment = (
-        db.query(DBExperiment).filter(DBExperiment.name == "Running A/B Test").first()
-    )
+    experiment = db.query(DBExperiment).filter(DBExperiment.name == "Running A/B Test").first()
 
     if experiment:
         logger.info("Running A/B test experiment already exists, skipping")
         return
-    
+
     # Create experiment
     experiment = DBExperiment(
         id=str(uuid4()),
@@ -499,7 +497,7 @@ async def seed_running_ab_test_experiment(db: Session) -> None:
     )
     db.add(experiment)
     db.flush()
-    
+
     # Create variants
     control = DBVariant(
         id=str(uuid4()),
@@ -509,7 +507,7 @@ async def seed_running_ab_test_experiment(db: Session) -> None:
         config={"button_color": "blue"},
         traffic_percentage=50.0,
     )
-    
+
     treatment = DBVariant(
         id=str(uuid4()),
         experiment_id=experiment.id,
@@ -518,16 +516,16 @@ async def seed_running_ab_test_experiment(db: Session) -> None:
         config={"button_color": "green"},
         traffic_percentage=50.0,
     )
-    
+
     db.add(control)
     db.add(treatment)
-    
+
     # Add metrics
     metrics = ["conversion_rate", "revenue_per_user"]
     for metric_name in metrics:
         metric = ExperimentMetric(experiment_id=experiment.id, metric_name=metric_name)
         db.add(metric)
-        
+
     # Add guardrail metrics
     guardrail = GuardrailMetric(
         experiment_id=experiment.id,
@@ -536,21 +534,19 @@ async def seed_running_ab_test_experiment(db: Session) -> None:
         operator=GuardrailOperator.LESS_THAN,
     )
     db.add(guardrail)
-    
+
     db.commit()
     logger.info("Created running A/B test experiment")
 
 
 async def seed_scheduled_ab_test_experiment(db: Session) -> None:
     """Seed a scheduled A/B test experiment."""
-    experiment = (
-        db.query(DBExperiment).filter(DBExperiment.name == "Scheduled A/B Test").first()
-    )
-    
+    experiment = db.query(DBExperiment).filter(DBExperiment.name == "Scheduled A/B Test").first()
+
     if experiment:
         logger.info("Scheduled A/B test experiment already exists, skipping")
         return
-    
+
     # Create experiment
     experiment = DBExperiment(
         id=str(uuid4()),
@@ -575,10 +571,10 @@ async def seed_scheduled_ab_test_experiment(db: Session) -> None:
         },
         default_metric_config={"min_sample_size": 100, "min_effect_size": 0.01},
     )
-    
+
     db.add(experiment)
     db.flush()
-    
+
     # Create variants
     control = DBVariant(
         id=str(uuid4()),
@@ -588,7 +584,7 @@ async def seed_scheduled_ab_test_experiment(db: Session) -> None:
         config={"button_color": "blue"},
         traffic_percentage=50.0,
     )
-    
+
     treatment = DBVariant(
         id=str(uuid4()),
         experiment_id=experiment.id,
@@ -597,16 +593,16 @@ async def seed_scheduled_ab_test_experiment(db: Session) -> None:
         config={"button_color": "green"},
         traffic_percentage=50.0,
     )
-    
+
     db.add(control)
     db.add(treatment)
-    
+
     # Add metrics
     metrics = ["conversion_rate", "revenue_per_user"]
     for metric_name in metrics:
         metric = ExperimentMetric(experiment_id=experiment.id, metric_name=metric_name)
         db.add(metric)
-        
+
     # Add guardrail metrics
     guardrail = GuardrailMetric(
         experiment_id=experiment.id,
@@ -615,20 +611,19 @@ async def seed_scheduled_ab_test_experiment(db: Session) -> None:
         operator=GuardrailOperator.LESS_THAN,
     )
     db.add(guardrail)
-    
+
     db.commit()
     logger.info("Created scheduled A/B test experiment")
 
+
 async def seed_completed_ab_test_experiment(db: Session) -> None:
     """Seed a completed A/B test experiment."""
-    experiment = (
-        db.query(DBExperiment).filter(DBExperiment.name == "Completed A/B Test").first()
-    )
-    
+    experiment = db.query(DBExperiment).filter(DBExperiment.name == "Completed A/B Test").first()
+
     if experiment:
         logger.info("Completed A/B test experiment already exists, skipping")
         return
-    
+
     # Create experiment
     experiment = DBExperiment(
         id=str(uuid4()),
@@ -653,10 +648,10 @@ async def seed_completed_ab_test_experiment(db: Session) -> None:
         },
         default_metric_config={"min_sample_size": 100, "min_effect_size": 0.01},
     )
-    
+
     db.add(experiment)
     db.flush()
-    
+
     # Create variants
     control = DBVariant(
         id=str(uuid4()),
@@ -666,7 +661,7 @@ async def seed_completed_ab_test_experiment(db: Session) -> None:
         config={"button_color": "blue"},
         traffic_percentage=50.0,
     )
-    
+
     treatment = DBVariant(
         id=str(uuid4()),
         experiment_id=experiment.id,
@@ -675,16 +670,16 @@ async def seed_completed_ab_test_experiment(db: Session) -> None:
         config={"button_color": "green"},
         traffic_percentage=50.0,
     )
-    
+
     db.add(control)
     db.add(treatment)
-    
+
     # Add metrics
     metrics = ["conversion_rate", "revenue_per_user"]
     for metric_name in metrics:
         metric = ExperimentMetric(experiment_id=experiment.id, metric_name=metric_name)
         db.add(metric)
-        
+
     # Add guardrail metrics
     guardrail = GuardrailMetric(
         experiment_id=experiment.id,
@@ -693,10 +688,10 @@ async def seed_completed_ab_test_experiment(db: Session) -> None:
         operator=GuardrailOperator.LESS_THAN,
     )
     db.add(guardrail)
-    
+
     db.commit()
     logger.info("Created completed A/B test experiment")
-        
+
 
 async def seed_all(db: Session) -> None:
     """Seed all data."""

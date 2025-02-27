@@ -86,6 +86,7 @@ def get_experiment_service(
         db=db,
     )
 
+
 def get_scheduler(
     experiment_service: ExperimentService = Depends(get_experiment_service),
     data_service: DataService = Depends(get_data_service),
@@ -98,4 +99,3 @@ def get_scheduler(
         db=db,
         check_interval=settings.scheduler_check_interval,
     )
-

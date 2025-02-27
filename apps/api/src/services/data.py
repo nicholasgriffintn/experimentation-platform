@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional, Union
 
 import clickhouse_driver
 from sqlalchemy.orm import Session, joinedload
@@ -11,16 +11,17 @@ from ..utils.logger import logger
 
 
 class DataService:
-    def __init__(self,
-                 metadata_db: Session,
-                 host: str,
-                 port: int,
-                 user: str,
-                 password: str,
-                 database: str = "experiments",
-        ):
+    def __init__(
+        self,
+        metadata_db: Session,
+        host: str,
+        port: int,
+        user: str,
+        password: str,
+        database: str = "experiments",
+    ):
         """Initialize ClickHouse data service
-        
+
         Args:
             host: ClickHouse server host
             port: ClickHouse server port
@@ -41,16 +42,16 @@ class DataService:
             user=user,
             password=password,
             database=database,
-            settings={'use_numpy': True}
+            settings={"use_numpy": True},
         )
-        
+
     def _execute_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict]:
         """Execute a query against ClickHouse
-        
+
         Args:
             query: SQL query to execute
             params: Query parameters
-            
+
         Returns:
             List of dictionaries with query results
         """
@@ -59,7 +60,7 @@ class DataService:
                 result = self.client.execute(query, params, with_column_types=True)
             else:
                 result = self.client.execute(query, with_column_types=True)
-                
+
             rows, columns = result
             column_names = [col[0] for col in columns]
             return [dict(zip(column_names, row)) for row in rows]
@@ -80,20 +81,26 @@ class DataService:
         )
         if not experiment:
             return {}
-        
+
         metrics = []
         for metric in experiment.metrics:
-            metrics.append({
-                "metric_name": metric.metric_name,
-                "name": metric.metric_name,
-                "type": getattr(metric, "type", "continuous")
-            })
-        
+            metrics.append(
+                {
+                    "metric_name": metric.metric_name,
+                    "name": metric.metric_name,
+                    "type": getattr(metric, "type", "continuous"),
+                }
+            )
+
         return {
             "id": experiment.id,
             "name": experiment.name,
             "type": experiment.type.value if hasattr(experiment.type, "value") else experiment.type,
-            "status": experiment.status.value if hasattr(experiment.status, "value") else experiment.status,
+            "status": (
+                experiment.status.value
+                if hasattr(experiment.status, "value")
+                else experiment.status
+            ),
             "start_time": experiment.start_time,
             "end_time": experiment.end_time,
             "variants": [
@@ -111,25 +118,23 @@ class DataService:
             "targeting_rules": getattr(experiment, "targeting_rules", {}),
             "traffic_allocation": getattr(experiment, "traffic_allocation", 100.0),
         }
-    
+
     async def set_experiment_config(self, experiment_id: str, config: Dict) -> None:
         """Set experiment configuration in database"""
         experiment = (
-            self.metadata_db.query(DBExperiment)
-            .filter(DBExperiment.id == experiment_id)
-            .first()
+            self.metadata_db.query(DBExperiment).filter(DBExperiment.id == experiment_id).first()
         )
         if not experiment:
             return
-        
+
         for key, value in config.items():
             setattr(experiment, key, value)
-            
+
         self.metadata_db.commit()
 
     async def record_event(self, experiment_id: str, event_data: Dict) -> None:
         """Record an experiment event in ClickHouse
-        
+
         Args:
             experiment_id: ID of the experiment
             event_data: Event data to record
@@ -138,16 +143,18 @@ class DataService:
         event_data["event_id"] = event_data.get("event_id", str(uuid.uuid4()))
         event_data["experiment_id"] = experiment_id
         event_data["timestamp"] = event_data.get("timestamp", datetime.utcnow())
-        
+
         columns = ", ".join(event_data.keys())
-        values = ", ".join([f"'{v}'" if isinstance(v, (str, datetime)) else str(v) for v in event_data.values()])
-        
+        values = ", ".join(
+            [f"'{v}'" if isinstance(v, (str, datetime)) else str(v) for v in event_data.values()]
+        )
+
         query = f"INSERT INTO {self.database}.{table_name} ({columns}) VALUES ({values})"
         self._execute_query(query)
 
     async def record_metric(self, experiment_id: str, metric_data: Dict) -> None:
         """Record a metric measurement for an experiment
-        
+
         Args:
             experiment_id: ID of the experiment
             metric_data: Metric data to record
@@ -155,16 +162,20 @@ class DataService:
         table_name = "metrics"
         metric_data["experiment_id"] = experiment_id
         metric_data["timestamp"] = metric_data.get("timestamp", datetime.utcnow())
-        
+
         columns = ", ".join(metric_data.keys())
-        values = ", ".join([f"'{v}'" if isinstance(v, (str, datetime)) else str(v) for v in metric_data.values()])
-        
+        values = ", ".join(
+            [f"'{v}'" if isinstance(v, (str, datetime)) else str(v) for v in metric_data.values()]
+        )
+
         query = f"INSERT INTO {self.database}.{table_name} ({columns}) VALUES ({values})"
         self._execute_query(query)
 
-    async def assign_variant(self, experiment_id: str, user_id: str, variant_id: str, context: Dict) -> None:
+    async def assign_variant(
+        self, experiment_id: str, user_id: str, variant_id: str, context: Dict
+    ) -> None:
         """Record a variant assignment for a user
-        
+
         Args:
             experiment_id: ID of the experiment
             user_id: ID of the user
@@ -179,16 +190,18 @@ class DataService:
             "timestamp": datetime.utcnow(),
             "context": str(context),
         }
-        
+
         columns = ", ".join(record.keys())
-        values = ", ".join([f"'{v}'" if isinstance(v, (str, datetime)) else str(v) for v in record.values()])
-        
+        values = ", ".join(
+            [f"'{v}'" if isinstance(v, (str, datetime)) else str(v) for v in record.values()]
+        )
+
         query = f"INSERT INTO {self.database}.{table_name} ({columns}) VALUES ({values})"
         self._execute_query(query)
 
     async def record_results(self, experiment_id: str, results_data: Dict) -> None:
         """Record analysis results for an experiment
-        
+
         Args:
             experiment_id: ID of the experiment
             results_data: Results data to record
@@ -196,7 +209,7 @@ class DataService:
         logger.info(f"Recording results for experiment {experiment_id}")
         table_name = "results"
         timestamp = datetime.utcnow()
-        
+
         for metric_name, variants_results in results_data.get("metrics", {}).items():
             for variant_id, result in variants_results.items():
                 record = {
@@ -209,10 +222,15 @@ class DataService:
                     "p_value": result.get("p_value", 1),
                     "is_significant": result.get("is_significant", False),
                 }
-                
+
                 columns = ", ".join(record.keys())
-                values = ", ".join([f"'{v}'" if isinstance(v, (str, datetime)) else str(v) for v in record.values()])
-                
+                values = ", ".join(
+                    [
+                        f"'{v}'" if isinstance(v, (str, datetime)) else str(v)
+                        for v in record.values()
+                    ]
+                )
+
                 query = f"INSERT INTO {self.database}.{table_name} ({columns}) VALUES ({values})"
                 self._execute_query(query)
 
@@ -220,12 +238,12 @@ class DataService:
         self, experiment_id: str, start_time: datetime, end_time: datetime
     ) -> List[Dict]:
         """Query events for an experiment within a time range
-        
+
         Args:
             experiment_id: ID of the experiment
             start_time: Start time for the query
             end_time: End time for the query
-            
+
         Returns:
             List of event dictionaries
         """
@@ -238,16 +256,16 @@ class DataService:
           AND timestamp <= '{end_time}'
         ORDER BY timestamp
         """
-        
+
         return self._execute_query(query)
 
     async def get_metric_history(self, experiment_id: str, metric_name: str) -> List[Dict]:
         """Get historical metric values for an experiment
-        
+
         Args:
             experiment_id: ID of the experiment
             metric_name: Name of the metric
-            
+
         Returns:
             List of metric value dictionaries
         """
@@ -259,15 +277,15 @@ class DataService:
           AND metric_name = '{metric_name}'
         ORDER BY timestamp
         """
-        
+
         return self._execute_query(query)
 
     async def get_exposure_data(self, experiment_id: str) -> List[Dict]:
         """Get exposure data for an experiment
-        
+
         Args:
             experiment_id: ID of the experiment
-            
+
         Returns:
             List of exposure dictionaries
         """
@@ -278,16 +296,16 @@ class DataService:
         WHERE experiment_id = '{experiment_id}'
         GROUP BY variant_id
         """
-        
+
         return self._execute_query(query)
 
     async def get_metric_data(self, experiment_id: str, metric_name: str) -> Dict[str, List[float]]:
         """Get metric data for an experiment grouped by variant
-        
+
         Args:
             experiment_id: ID of the experiment
             metric_name: Name of the metric
-            
+
         Returns:
             Dictionary mapping variant IDs to lists of metric values
         """
@@ -298,31 +316,31 @@ class DataService:
         WHERE experiment_id = '{experiment_id}'
           AND metric_name = '{metric_name}'
         """
-        
+
         results = self._execute_query(query)
-        
-        grouped_data = {}
+
+        grouped_data: Dict[str, List[float]] = {}
         for row in results:
             variant_id = row.get("variant_id")
             metric_value = row.get("metric_value")
-            
+
             if not variant_id or metric_value is None:
                 continue
-                
+
             if variant_id not in grouped_data:
                 grouped_data[variant_id] = []
-                
+
             grouped_data[variant_id].append(float(metric_value))
-            
+
         return grouped_data
 
     async def get_experiment_snapshot(self, experiment_id: str, timestamp: datetime) -> Dict:
         """Get a snapshot of experiment data at a specific time
-        
+
         Args:
             experiment_id: ID of the experiment
             timestamp: Timestamp for the snapshot
-            
+
         Returns:
             Dictionary with experiment snapshot data
         """
@@ -334,9 +352,9 @@ class DataService:
           AND timestamp <= '{timestamp}'
         GROUP BY variant_id
         """
-        
+
         assignments = self._execute_query(assignments_query)
-        
+
         events_table = "events"
         events_query = f"""
         SELECT variant_id, event_type, count() as count
@@ -345,87 +363,92 @@ class DataService:
           AND timestamp <= '{timestamp}'
         GROUP BY variant_id, event_type
         """
-        
+
         events = self._execute_query(events_query)
-        
+
         result = {
             "assignments": {row["variant_id"]: row["count"] for row in assignments},
             "events": {},
         }
-        
+
         for row in events:
             variant_id = row["variant_id"]
             event_type = row["event_type"]
             if variant_id not in result["events"]:
                 result["events"][variant_id] = {}
             result["events"][variant_id][event_type] = row["count"]
-            
+
         return result
-        
+
     async def get_stored_results(self, experiment_id: str) -> Optional[Dict[str, Any]]:
         """Get the most recent stored results for an experiment
-        
+
         Args:
             experiment_id: ID of the experiment
-            
+
         Returns:
             Dictionary with the most recent experiment results, or None if no results exist
         """
         logger.info(f"Retrieving stored results for experiment {experiment_id}")
         table_name = "results"
-        
+
         timestamp_query = f"""
         SELECT MAX(timestamp) as latest_timestamp
         FROM {self.database}.{table_name}
         WHERE experiment_id = '{experiment_id}'
         """
-        
+
         timestamp_result = self._execute_query(timestamp_query)
         if not timestamp_result or not timestamp_result[0].get("latest_timestamp"):
             logger.info(f"No stored results found for experiment {experiment_id}")
             return None
-            
+
         latest_timestamp = timestamp_result[0]["latest_timestamp"]
-        
+
         results_query = f"""
         SELECT experiment_id, metric_name, variant_id, sample_size, mean, p_value, is_significant, timestamp
         FROM {self.database}.{table_name}
         WHERE experiment_id = '{experiment_id}'
           AND timestamp = '{latest_timestamp}'
         """
-        
+
         results_data = self._execute_query(results_query)
         if not results_data:
             return None
-            
+
         experiment = (
-            self.metadata_db.query(DBExperiment)
-            .filter(DBExperiment.id == experiment_id)
-            .first()
+            self.metadata_db.query(DBExperiment).filter(DBExperiment.id == experiment_id).first()
         )
-        
-        metrics_results = {}
+
+        if not experiment:
+            return None
+
+        metrics_results: Dict[str, Dict[str, Dict[str, Union[int, float, bool]]]] = {}
         total_users = 0
-        
+
         for row in results_data:
             metric_name = row["metric_name"]
             variant_id = row["variant_id"]
-            
+
             if metric_name not in metrics_results:
                 metrics_results[metric_name] = {}
-                
+
             metrics_results[metric_name][variant_id] = {
                 "sample_size": row["sample_size"],
                 "mean": row["mean"],
                 "p_value": row["p_value"],
                 "is_significant": row.get("is_significant", False),
             }
-            
+
             total_users = max(total_users, row["sample_size"])
-        
+
         return {
             "experiment_id": experiment_id,
-            "status": experiment.status.value if hasattr(experiment.status, "value") else experiment.status,
+            "status": (
+                experiment.status.value
+                if hasattr(experiment.status, "value")
+                else experiment.status
+            ),
             "start_time": experiment.start_time,
             "end_time": experiment.end_time,
             "total_users": total_users,

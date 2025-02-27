@@ -1,7 +1,7 @@
 import hashlib
 from typing import Dict, Optional
 
-from ..models.experiments_model import ExperimentType, VariantConfig
+from ..types import ExperimentType, VariantConfig
 
 
 class BucketingService:
