@@ -434,3 +434,33 @@ class ExperimentService:
                 
                 if self.cache_service:
                     await self.cache_service.set_experiment_config(experiment_id, config)
+                    
+    async def get_results(self, experiment_id: str, metrics: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Get the most recent results for an experiment
+        
+        This method first tries to retrieve stored results from the database.
+        If no stored results exist, it performs a new analysis.
+        
+        Args:
+            experiment_id: ID of the experiment
+            metrics: Optional list of specific metrics to analyze
+            
+        Returns:
+            Dictionary with experiment results
+        """
+        logger.info(f"Getting results for experiment {experiment_id}")
+        
+        stored_results = await self.data_service.get_stored_results(experiment_id)
+        
+        if stored_results:
+            logger.info(f"Using stored results for experiment {experiment_id}")
+            if metrics and stored_results.get("metrics"):
+                filtered_metrics = {}
+                for metric_name in metrics:
+                    if metric_name in stored_results["metrics"]:
+                        filtered_metrics[metric_name] = stored_results["metrics"][metric_name]
+                stored_results["metrics"] = filtered_metrics
+            return stored_results
+            
+        logger.info(f"No stored results found for experiment {experiment_id}, performing new analysis")
+        return await self.analyze_results(experiment_id=experiment_id, metrics=metrics)

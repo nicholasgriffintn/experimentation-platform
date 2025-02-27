@@ -361,3 +361,74 @@ class DataService:
             result["events"][variant_id][event_type] = row["count"]
             
         return result
+        
+    async def get_stored_results(self, experiment_id: str) -> Optional[Dict[str, Any]]:
+        """Get the most recent stored results for an experiment
+        
+        Args:
+            experiment_id: ID of the experiment
+            
+        Returns:
+            Dictionary with the most recent experiment results, or None if no results exist
+        """
+        logger.info(f"Retrieving stored results for experiment {experiment_id}")
+        table_name = "results"
+        
+        timestamp_query = f"""
+        SELECT MAX(timestamp) as latest_timestamp
+        FROM {self.database}.{table_name}
+        WHERE experiment_id = '{experiment_id}'
+        """
+        
+        timestamp_result = self._execute_query(timestamp_query)
+        if not timestamp_result or not timestamp_result[0].get("latest_timestamp"):
+            logger.info(f"No stored results found for experiment {experiment_id}")
+            return None
+            
+        latest_timestamp = timestamp_result[0]["latest_timestamp"]
+        
+        results_query = f"""
+        SELECT experiment_id, metric_name, variant_id, sample_size, mean, p_value, is_significant, timestamp
+        FROM {self.database}.{table_name}
+        WHERE experiment_id = '{experiment_id}'
+          AND timestamp = '{latest_timestamp}'
+        """
+        
+        results_data = self._execute_query(results_query)
+        if not results_data:
+            return None
+            
+        experiment = (
+            self.metadata_db.query(DBExperiment)
+            .filter(DBExperiment.id == experiment_id)
+            .first()
+        )
+        
+        metrics_results = {}
+        total_users = 0
+        
+        for row in results_data:
+            metric_name = row["metric_name"]
+            variant_id = row["variant_id"]
+            
+            if metric_name not in metrics_results:
+                metrics_results[metric_name] = {}
+                
+            metrics_results[metric_name][variant_id] = {
+                "sample_size": row["sample_size"],
+                "mean": row["mean"],
+                "p_value": row["p_value"],
+                "is_significant": row.get("is_significant", False),
+            }
+            
+            total_users = max(total_users, row["sample_size"])
+        
+        return {
+            "experiment_id": experiment_id,
+            "status": experiment.status.value if hasattr(experiment.status, "value") else experiment.status,
+            "start_time": experiment.start_time,
+            "end_time": experiment.end_time,
+            "total_users": total_users,
+            "metrics": metrics_results,
+            "timestamp": latest_timestamp,
+        }

@@ -286,12 +286,16 @@ async def get_results(
     """
     get_experiment_from_db(experiment_id, db)
 
-    results = await experiment_service.analyze_results(experiment_id=experiment_id, metrics=metrics)
+    results = await experiment_service.get_results(experiment_id=experiment_id, metrics=metrics)
+
+    start_time = results.get("start_time")
+    if start_time is None:
+        start_time = datetime.utcnow()
 
     return ExperimentResults(
         experiment_id=results["experiment_id"],
         status=results["status"],
-        start_time=results["start_time"],
+        start_time=start_time,
         end_time=results["end_time"],
         total_users=results["total_users"],
         metrics=results["metrics"],
