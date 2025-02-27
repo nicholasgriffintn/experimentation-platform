@@ -48,4 +48,5 @@ fi
 echo "Setup complete! Services are running."
 echo "You can access:"
 echo "- ClickHouse HTTP: http://localhost:8123"
+echo "- ClickHouse UI: http://localhost:5521"
 echo "Please start the frontend and api services separately with the command 'pnpm run dev'."
