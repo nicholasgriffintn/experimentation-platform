@@ -69,9 +69,22 @@ uvicorn src.main:app --reload
 
 The API will be available at http://localhost:8000.
 
+## API Documentation
+
+When the API is running, you can access the interactive documentation at:
+
+- Swagger UI: http://localhost:8000/api/docs
+- ReDoc: http://localhost:8000/api/redoc
+
 ## Database Migrations
 
-To create a new migration after modifying models:
+First you need to navigate to the API directory:
+
+```bash
+cd apps/api
+```
+
+Then, to create a new migration after modifying models:
 ```bash
 alembic revision --autogenerate -m "description of changes"
 ```
@@ -89,7 +102,7 @@ alembic downgrade base  # Rollback all migrations
 
 ## ClickHouse Management
 
-The API uses ClickHouse for storing and analyzing experimental data. You can interact with ClickHouse directly using the ClickHouse client:
+The platform uses ClickHouse for storing and analyzing experiment events and analytics data. You can interact with ClickHouse directly using the ClickHouse client:
 
 ```bash
 docker exec -it clickhouse-server clickhouse-client
@@ -98,25 +111,21 @@ docker exec -it clickhouse-server clickhouse-client
 Common ClickHouse commands:
 
 ```sql
--- Show databases
 SHOW DATABASES;
 
--- Use experiments database
 USE experiments;
 
--- Show tables
 SHOW TABLES;
+DESCRIBE TABLE experiments.events;
 
--- Describe table structure
-DESCRIBE TABLE experiments.<experiment_id>_events;
-
--- Query data
-SELECT * FROM experiments.<experiment_id>_events LIMIT 10;
+SELECT * FROM experiments.events LIMIT 10;
 ```
 
-## API Documentation
+## Testing ClickHouse Connection
 
-When the API is running, you can access the interactive documentation at:
+To test the connection to ClickHouse, you can run the following script:
 
-- Swagger UI: http://localhost:8000/api/docs
-- ReDoc: http://localhost:8000/api/redoc
+```bash
+cd apps/api
+python scripts/test_clickhouse.py
+```
