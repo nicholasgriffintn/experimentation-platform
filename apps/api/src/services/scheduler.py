@@ -76,7 +76,11 @@ class ExperimentScheduler:
 
             experiments = (
                 self.db.query(Experiment)
-                .filter(Experiment.status.in_([ExperimentStatus.DRAFT, ExperimentStatus.RUNNING]))
+                .filter(Experiment.status.in_([
+                    ExperimentStatus.DRAFT,
+                    ExperimentStatus.RUNNING,
+                    ExperimentStatus.SCHEDULED,
+                ]))
                 .all()
             )
 
@@ -84,6 +88,9 @@ class ExperimentScheduler:
                 if (
                     experiment.status == ExperimentStatus.DRAFT
                     and experiment.start_time
+                    and experiment.start_time <= now
+                ) or (
+                    experiment.status == ExperimentStatus.SCHEDULED
                     and experiment.start_time <= now
                 ):
                     await self.start_experiment(experiment)
@@ -294,7 +301,14 @@ class ExperimentScheduler:
                     await self.stop_experiment(experiment, reason="Reached target sample size")
                     return
 
+            if not self.experiment_service:
+                raise ValueError("An experiment service connection is required")
+
             results = await self.experiment_service.analyze_results(str(experiment.id))
+
+            if not results or not results.get("metrics"):
+                logger.warning(f"No results available for experiment {experiment.id}")
+                return
 
             if getattr(experiment, "analysis_config", {}).get("sequential_testing"):
                 stopping_threshold = float(

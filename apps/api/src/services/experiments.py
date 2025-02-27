@@ -212,16 +212,20 @@ class ExperimentService:
             metrics_to_analyze = metrics
         else:
             metrics_to_analyze = []
-            config_metrics = config.get("metrics", {})
+            config_metrics = config.get("metrics", [])
             for metric in config_metrics:
                 if isinstance(metric, dict):
-                    metrics_to_analyze.append(metric.get("name"))
+                    metrics_to_analyze.append(metric.get("metric_name") or metric.get("name"))
                 elif isinstance(metric, str):
                     metrics_to_analyze.append(metric)
                 else:
-                    metrics_to_analyze.append(metric.name)
+                    try:
+                        metrics_to_analyze.append(metric.metric_name)
+                    except AttributeError:
+                        logger.warning(f"Could not extract metric name from {metric}")
 
         if not metrics_to_analyze:
+            logger.warning(f"No metrics to analyze for experiment {experiment_id}")
             return {
                 "experiment_id": experiment_id,
                 "status": config.get("status", "running"),
@@ -266,56 +270,75 @@ class ExperimentService:
                 method = analysis_config.get("method", AnalysisMethod.FREQUENTIST)
                 sequential = analysis_config.get("sequential_testing", False)
                 stopping_threshold = analysis_config.get("stopping_threshold", 0.01)
+                
+                # Find metric type from config
+                metric_type = "continuous"  # default
+                for m in config.get("metrics", []):
+                    if isinstance(m, dict) and (m.get("metric_name") == metric_name or m.get("name") == metric_name):
+                        metric_type = m.get("type", "continuous")
+                        break
 
-                analysis_result = await self.analysis_service.analyze_experiment(
-                    control_data=control_data,
-                    variant_data=variant_data,
-                    metric_type=config["metrics"][metric_name].type,
-                    metric_name=metric_name,
-                    alpha=config.get("analysis_config", {}).get("alpha", 0.05),
-                    correction_method=config.get("analysis_config", {}).get("correction_method"),
-                    method=method,
-                    sequential=sequential,
-                    stopping_threshold=stopping_threshold,
-                )
-
-                all_p_values.append(analysis_result.frequentist_results.p_value)
-                variant_p_values[(metric_name, variant_id)] = len(all_p_values) - 1
-                metrics_results[metric_name][variant_id] = {
-                    "sample_size": len(variant_data),
-                    "mean": float(analysis_result.frequentist_results.variant_mean),
-                    "variance": float(
-                        (
-                            analysis_result.frequentist_results.confidence_interval[1]
-                            - analysis_result.frequentist_results.confidence_interval[0]
-                        )
-                        / 3.92
-                    ),
-                    "confidence_level": 0.95,
-                    "p_value": float(analysis_result.frequentist_results.p_value),
-                }
-
-                if self.cache_service:
-                    await self.cache_service.set_metric_stats(
-                        experiment_id=experiment_id,
+                try:
+                    analysis_result = await self.analysis_service.analyze_experiment(
+                        control_data=control_data,
+                        variant_data=variant_data,
                         metric_name=metric_name,
-                        stats=metrics_results[metric_name],
+                        metric_type=metric_type,
+                        alpha=config.get("analysis_config", {}).get("alpha", 0.05),
+                        correction_method=config.get("analysis_config", {}).get("correction_method"),
+                        method=method,
+                        sequential=sequential,
+                        stopping_threshold=stopping_threshold,
                     )
 
+                    all_p_values.append(analysis_result.frequentist_results.p_value)
+                    variant_p_values[(metric_name, variant_id)] = len(all_p_values) - 1
+                    metrics_results[metric_name][variant_id] = {
+                        "sample_size": len(variant_data),
+                        "mean": float(analysis_result.frequentist_results.variant_mean),
+                        "variance": float(
+                            (
+                                analysis_result.frequentist_results.confidence_interval[1]
+                                - analysis_result.frequentist_results.confidence_interval[0]
+                            )
+                            / 3.92
+                        ),
+                        "confidence_level": 0.95,
+                        "p_value": float(analysis_result.frequentist_results.p_value),
+                    }
+
+                    if self.cache_service:
+                        await self.cache_service.set_metric_stats(
+                            experiment_id=experiment_id,
+                            metric_name=metric_name,
+                            stats=metrics_results[metric_name],
+                        )
+                except Exception as e:
+                    logger.error(f"Error analyzing metric {metric_name} for variant {variant_id}: {str(e)}")
+                    metrics_results[metric_name][variant_id] = {
+                        "sample_size": len(variant_data),
+                        "mean": float(sum(variant_data) / len(variant_data)) if variant_data else 0,
+                        "error": str(e),
+                    }
+
+        correction_method = None
         if len(all_p_values) > 1:
             correction_method = config.get("analysis_config", {}).get(
                 "correction_method", CorrectionMethod.FDR_BH
             )
-            corrected_p_values = self.analysis_service.correction_service.apply_correction(
-                all_p_values, method=correction_method
-            )
-
-            for (metric_name, variant_id), p_value_idx in variant_p_values.items():
-                corrected_p_value = corrected_p_values[p_value_idx]
-                metrics_results[metric_name][variant_id]["p_value"] = corrected_p_value
-                metrics_results[metric_name][variant_id]["is_significant"] = (
-                    corrected_p_value < config.get("analysis_config", {}).get("alpha", 0.05)
+            try:
+                corrected_p_values = self.analysis_service.correction_service.apply_correction(
+                    all_p_values, method=correction_method
                 )
+
+                for (metric_name, variant_id), p_value_idx in variant_p_values.items():
+                    corrected_p_value = corrected_p_values[p_value_idx]
+                    metrics_results[metric_name][variant_id]["p_value"] = corrected_p_value
+                    metrics_results[metric_name][variant_id]["is_significant"] = (
+                        corrected_p_value < config.get("analysis_config", {}).get("alpha", 0.05)
+                    )
+            except Exception as e:
+                logger.error(f"Error applying correction to p-values: {str(e)}")
 
         results = {
             "experiment_id": experiment_id,

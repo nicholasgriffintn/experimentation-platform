@@ -55,7 +55,11 @@ class DataService:
             List of dictionaries with query results
         """
         try:
-            result = self.client.execute(query, params or {}, with_column_types=True)
+            if params:
+                result = self.client.execute(query, params, with_column_types=True)
+            else:
+                result = self.client.execute(query, with_column_types=True)
+                
             rows, columns = result
             column_names = [col[0] for col in columns]
             return [dict(zip(column_names, row)) for row in rows]
@@ -71,25 +75,41 @@ class DataService:
             self.metadata_db.query(DBExperiment)
             .filter(DBExperiment.id == experiment_id)
             .options(joinedload(DBExperiment.variants))
+            .options(joinedload(DBExperiment.metrics))
             .first()
         )
         if not experiment:
             return {}
         
+        metrics = []
+        for metric in experiment.metrics:
+            metrics.append({
+                "metric_name": metric.metric_name,
+                "name": metric.metric_name,
+                "type": getattr(metric, "type", "continuous")
+            })
+        
         return {
             "id": experiment.id,
             "name": experiment.name,
-            "type": experiment.type.value,
-            "status": experiment.status.value,
+            "type": experiment.type.value if hasattr(experiment.type, "value") else experiment.type,
+            "status": experiment.status.value if hasattr(experiment.status, "value") else experiment.status,
+            "start_time": experiment.start_time,
+            "end_time": experiment.end_time,
             "variants": [
                 {
                     "id": variant.id,
                     "name": variant.name,
-                    "type": variant.type,
+                    "type": variant.type.value if hasattr(variant.type, "value") else variant.type,
+                    "config": variant.config,
                     "traffic_percentage": variant.traffic_percentage,
                 }
                 for variant in experiment.variants
             ],
+            "metrics": metrics,
+            "analysis_config": getattr(experiment, "analysis_config", {}),
+            "targeting_rules": getattr(experiment, "targeting_rules", {}),
+            "traffic_allocation": getattr(experiment, "traffic_allocation", 100.0),
         }
     
     async def set_experiment_config(self, experiment_id: str, config: Dict) -> None:
@@ -120,73 +140,81 @@ class DataService:
         event_data["timestamp"] = event_data.get("timestamp", datetime.utcnow())
         
         columns = ", ".join(event_data.keys())
-        placeholders = ", ".join([f":{key}" for key in event_data.keys()])
+        values = ", ".join([f"'{v}'" if isinstance(v, (str, datetime)) else str(v) for v in event_data.values()])
         
-        query = f"INSERT INTO {self.database}.{table_name} ({columns}) VALUES ({placeholders})"
-        self._execute_query(query, event_data)
+        query = f"INSERT INTO {self.database}.{table_name} ({columns}) VALUES ({values})"
+        self._execute_query(query)
 
     async def record_metric(self, experiment_id: str, metric_data: Dict) -> None:
-        """Record a metric value in ClickHouse
+        """Record a metric measurement for an experiment
         
         Args:
             experiment_id: ID of the experiment
             metric_data: Metric data to record
         """
         table_name = "metrics"
-        metric_data["metric_id"] = metric_data.get("metric_id", str(uuid.uuid4()))
         metric_data["experiment_id"] = experiment_id
         metric_data["timestamp"] = metric_data.get("timestamp", datetime.utcnow())
         
         columns = ", ".join(metric_data.keys())
-        placeholders = ", ".join([f":{key}" for key in metric_data.keys()])
+        values = ", ".join([f"'{v}'" if isinstance(v, (str, datetime)) else str(v) for v in metric_data.values()])
         
-        query = f"INSERT INTO {self.database}.{table_name} ({columns}) VALUES ({placeholders})"
-        self._execute_query(query, metric_data)
+        query = f"INSERT INTO {self.database}.{table_name} ({columns}) VALUES ({values})"
+        self._execute_query(query)
 
-    async def assign_variant(
-        self, experiment_id: str, user_id: str, variant_id: str, context: Optional[Dict] = None
-    ) -> None:
-        """Record a user-variant assignment in ClickHouse
+    async def assign_variant(self, experiment_id: str, user_id: str, variant_id: str, context: Dict) -> None:
+        """Record a variant assignment for a user
         
         Args:
             experiment_id: ID of the experiment
             user_id: ID of the user
-            variant_id: ID of the variant
-            context: Additional context data
+            variant_id: ID of the assigned variant
+            context: User context data
         """
         table_name = "assignments"
-        assignment_data = {
-            "assignment_id": str(uuid.uuid4()),
+        record = {
             "experiment_id": experiment_id,
             "user_id": user_id,
             "variant_id": variant_id,
             "timestamp": datetime.utcnow(),
-            "context": context or {},
+            "context": str(context),
         }
         
-        columns = ", ".join(assignment_data.keys())
-        placeholders = ", ".join([f":{key}" for key in assignment_data.keys()])
+        columns = ", ".join(record.keys())
+        values = ", ".join([f"'{v}'" if isinstance(v, (str, datetime)) else str(v) for v in record.values()])
         
-        query = f"INSERT INTO {self.database}.{table_name} ({columns}) VALUES ({placeholders})"
-        self._execute_query(query, assignment_data)
+        query = f"INSERT INTO {self.database}.{table_name} ({columns}) VALUES ({values})"
+        self._execute_query(query)
 
     async def record_results(self, experiment_id: str, results_data: Dict) -> None:
-        """Record experiment results in ClickHouse
+        """Record analysis results for an experiment
         
         Args:
             experiment_id: ID of the experiment
             results_data: Results data to record
         """
+        logger.info(f"Recording results for experiment {experiment_id}")
         table_name = "results"
-        results_data["result_id"] = results_data.get("result_id", str(uuid.uuid4()))
-        results_data["experiment_id"] = experiment_id
-        results_data["timestamp"] = results_data.get("timestamp", datetime.utcnow())
+        timestamp = datetime.utcnow()
         
-        columns = ", ".join(results_data.keys())
-        placeholders = ", ".join([f":{key}" for key in results_data.keys()])
-        
-        query = f"INSERT INTO {self.database}.{table_name} ({columns}) VALUES ({placeholders})"
-        self._execute_query(query, results_data)
+        for metric_name, variants_results in results_data.get("metrics", {}).items():
+            for variant_id, result in variants_results.items():
+                record = {
+                    "experiment_id": experiment_id,
+                    "metric_name": metric_name,
+                    "variant_id": variant_id,
+                    "timestamp": timestamp,
+                    "sample_size": result.get("sample_size", 0),
+                    "mean": result.get("mean", 0),
+                    "p_value": result.get("p_value", 1),
+                    "is_significant": result.get("is_significant", False),
+                }
+                
+                columns = ", ".join(record.keys())
+                values = ", ".join([f"'{v}'" if isinstance(v, (str, datetime)) else str(v) for v in record.values()])
+                
+                query = f"INSERT INTO {self.database}.{table_name} ({columns}) VALUES ({values})"
+                self._execute_query(query)
 
     async def query_events(
         self, experiment_id: str, start_time: datetime, end_time: datetime
@@ -205,19 +233,13 @@ class DataService:
         query = f"""
         SELECT *
         FROM {self.database}.{table_name}
-        WHERE experiment_id = :experiment_id
-          AND timestamp >= :start_time
-          AND timestamp <= :end_time
+        WHERE experiment_id = '{experiment_id}'
+          AND timestamp >= '{start_time}'
+          AND timestamp <= '{end_time}'
         ORDER BY timestamp
         """
         
-        params = {
-            "experiment_id": experiment_id,
-            "start_time": start_time,
-            "end_time": end_time,
-        }
-        
-        return self._execute_query(query, params)
+        return self._execute_query(query)
 
     async def get_metric_history(self, experiment_id: str, metric_name: str) -> List[Dict]:
         """Get historical metric values for an experiment
@@ -233,17 +255,12 @@ class DataService:
         query = f"""
         SELECT *
         FROM {self.database}.{table_name}
-        WHERE experiment_id = :experiment_id
-          AND metric_name = :metric_name
+        WHERE experiment_id = '{experiment_id}'
+          AND metric_name = '{metric_name}'
         ORDER BY timestamp
         """
         
-        params = {
-            "experiment_id": experiment_id,
-            "metric_name": metric_name,
-        }
-        
-        return self._execute_query(query, params)
+        return self._execute_query(query)
 
     async def get_exposure_data(self, experiment_id: str) -> List[Dict]:
         """Get exposure data for an experiment
@@ -258,15 +275,11 @@ class DataService:
         query = f"""
         SELECT variant_id, count() as count
         FROM {self.database}.{table_name}
-        WHERE experiment_id = :experiment_id
+        WHERE experiment_id = '{experiment_id}'
         GROUP BY variant_id
         """
         
-        params = {
-            "experiment_id": experiment_id,
-        }
-        
-        return self._execute_query(query, params)
+        return self._execute_query(query)
 
     async def get_metric_data(self, experiment_id: str, metric_name: str) -> Dict[str, List[float]]:
         """Get metric data for an experiment grouped by variant
@@ -282,26 +295,26 @@ class DataService:
         query = f"""
         SELECT variant_id, metric_value
         FROM {self.database}.{table_name}
-        WHERE experiment_id = :experiment_id
-          AND metric_name = :metric_name
+        WHERE experiment_id = '{experiment_id}'
+          AND metric_name = '{metric_name}'
         """
         
-        params = {
-            "experiment_id": experiment_id,
-            "metric_name": metric_name,
-        }
+        results = self._execute_query(query)
         
-        results = self._execute_query(query, params)
-        
-        # Group by variant_id
-        data: Dict[str, List[float]] = {}
+        grouped_data = {}
         for row in results:
-            variant_id = row["variant_id"]
-            if variant_id not in data:
-                data[variant_id] = []
-            data[variant_id].append(row["metric_value"])
+            variant_id = row.get("variant_id")
+            metric_value = row.get("metric_value")
             
-        return data
+            if not variant_id or metric_value is None:
+                continue
+                
+            if variant_id not in grouped_data:
+                grouped_data[variant_id] = []
+                
+            grouped_data[variant_id].append(float(metric_value))
+            
+        return grouped_data
 
     async def get_experiment_snapshot(self, experiment_id: str, timestamp: datetime) -> Dict:
         """Get a snapshot of experiment data at a specific time
@@ -317,33 +330,23 @@ class DataService:
         assignments_query = f"""
         SELECT variant_id, count() as count
         FROM {self.database}.{assignments_table}
-        WHERE experiment_id = :experiment_id
-          AND timestamp <= :timestamp
+        WHERE experiment_id = '{experiment_id}'
+          AND timestamp <= '{timestamp}'
         GROUP BY variant_id
         """
         
-        assignments_params = {
-            "experiment_id": experiment_id,
-            "timestamp": timestamp,
-        }
-        
-        assignments = self._execute_query(assignments_query, assignments_params)
+        assignments = self._execute_query(assignments_query)
         
         events_table = "events"
         events_query = f"""
         SELECT variant_id, event_type, count() as count
         FROM {self.database}.{events_table}
-        WHERE experiment_id = :experiment_id
-          AND timestamp <= :timestamp
+        WHERE experiment_id = '{experiment_id}'
+          AND timestamp <= '{timestamp}'
         GROUP BY variant_id, event_type
         """
         
-        events_params = {
-            "experiment_id": experiment_id,
-            "timestamp": timestamp,
-        }
-        
-        events = self._execute_query(events_query, events_params)
+        events = self._execute_query(events_query)
         
         result = {
             "assignments": {row["variant_id"]: row["count"] for row in assignments},

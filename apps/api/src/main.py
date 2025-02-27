@@ -8,10 +8,11 @@ from .config.app import settings
 from .db.base import Base
 from .db.seed import seed_all
 from .db.session import engine
-from .dependencies import get_db, get_experiment_service, get_data_service
+from .dependencies import get_db, get_data_service, get_analysis_service, get_cache_service, get_experiment_service
 from .middleware.error_handler import error_handler
 from .routers import experiments, features, metrics, system
 from .services.scheduler import ExperimentScheduler
+from .services.experiments import ExperimentService
 from .utils.logger import LogConfig, logger
 
 logging.config.dictConfig(LogConfig().dict())
@@ -79,8 +80,10 @@ async def startup_event() -> None:
     if settings.scheduler_enabled:
         global scheduler
         db = next(get_db())
-        experiment_service = get_experiment_service(db)
-        data_service = get_data_service()
+        data_service = get_data_service(db)
+        analysis_service = get_analysis_service()
+        cache_service = get_cache_service()
+        experiment_service = get_experiment_service(db, data_service, analysis_service, cache_service)
         scheduler = ExperimentScheduler(
             experiment_service=experiment_service,
             data_service=data_service,

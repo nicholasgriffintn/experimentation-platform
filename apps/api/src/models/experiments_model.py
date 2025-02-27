@@ -14,7 +14,7 @@ class ExperimentBase(BaseModel):
     name: str = Field(..., description="Name of the experiment")
     description: str = Field(..., description="Description of what the experiment is testing")
     type: ExperimentType = Field(..., description="Type of experiment")
-    hypothesis: str = Field(..., description="What is being tested")
+    hypothesis: Optional[str] = Field(None, description="What is being tested")
     parameters: Dict[str, Any] = Field(default_factory=dict)
     targeting_rules: Dict[str, Any] = Field(
         default_factory=dict, description="Rules for targeting specific users"
