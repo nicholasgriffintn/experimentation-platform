@@ -7,7 +7,6 @@
     export let loading = false;
     export let error: string | null = null;
     export let createButtonLabel = 'Create';
-    export let showCreateForm = false;
 
     const dispatch = createEventDispatcher<{
         create: void;
