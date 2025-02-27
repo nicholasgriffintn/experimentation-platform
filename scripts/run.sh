@@ -47,6 +47,5 @@ fi
 
 echo "Setup complete! Services are running."
 echo "You can access:"
-echo "- MinIO Console: http://localhost:9001"
 echo "- ClickHouse HTTP: http://localhost:8123"
 echo "Please start the frontend and api services separately with the command 'pnpm run dev'."

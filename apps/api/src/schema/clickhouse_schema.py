@@ -1,9 +1,9 @@
 class ClickHouseSchemas:
     @staticmethod
     def get_events_schema() -> str:
-        """Schema for experiment events table"""
+        """Schema for consolidated experiment events table"""
         return """
-        CREATE TABLE IF NOT EXISTS {database}.{table_name} (
+        CREATE TABLE IF NOT EXISTS {database}.events (
             event_id String,
             experiment_id String,
             timestamp DateTime64(3),
@@ -21,9 +21,9 @@ class ClickHouseSchemas:
 
     @staticmethod
     def get_metrics_schema() -> str:
-        """Schema for experiment metrics table"""
+        """Schema for consolidated experiment metrics table"""
         return """
-        CREATE TABLE IF NOT EXISTS {database}.{table_name} (
+        CREATE TABLE IF NOT EXISTS {database}.metrics (
             metric_id String,
             experiment_id String,
             variant_id String,
@@ -40,9 +40,9 @@ class ClickHouseSchemas:
 
     @staticmethod
     def get_assignments_schema() -> str:
-        """Schema for user-variant assignments table"""
+        """Schema for consolidated user-variant assignments table"""
         return """
-        CREATE TABLE IF NOT EXISTS {database}.{table_name} (
+        CREATE TABLE IF NOT EXISTS {database}.assignments (
             assignment_id String,
             experiment_id String,
             user_id String,
@@ -57,9 +57,9 @@ class ClickHouseSchemas:
 
     @staticmethod
     def get_results_schema() -> str:
-        """Schema for experiment results table"""
+        """Schema for consolidated experiment results table"""
         return """
-        CREATE TABLE IF NOT EXISTS {database}.{table_name} (
+        CREATE TABLE IF NOT EXISTS {database}.results (
             result_id String,
             experiment_id String,
             variant_id String,

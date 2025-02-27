@@ -65,56 +65,6 @@ class DataService:
             logger.error(f"Params: {params}")
             raise
 
-    async def initialize_experiment_tables(self, experiment_id: str) -> bool:
-        """Initialize all required tables for a new experiment
-
-        Returns:
-            bool: True if all tables were created successfully or already exist, False otherwise
-        """
-        safe_experiment_id = experiment_id.replace("-", "_")
-        
-        tables_to_create = [
-            (f"{safe_experiment_id}_events", self.schemas.get_events_schema()),
-            (f"{safe_experiment_id}_metrics", self.schemas.get_metrics_schema()),
-            (f"{safe_experiment_id}_assignments", self.schemas.get_assignments_schema()),
-            (f"{safe_experiment_id}_results", self.schemas.get_results_schema()),
-        ]
-
-        success = True
-        for table_name, schema_template in tables_to_create:
-            if not self.create_table(table_name, schema_template):
-                success = False
-                logger.error(f"Failed to create or verify table {table_name}")
-                break
-
-        return success
-
-    def create_table(self, table_name: str, schema_template: str) -> bool:
-        """Create a new ClickHouse table
-        
-        Args:
-            table_name: Name of the table to create
-            schema_template: SQL schema template for the table
-            
-        Returns:
-            bool: True if table was created successfully or already exists, False otherwise
-        """
-        try:
-            check_query = f"SHOW TABLES LIKE '{table_name}'"
-            result = self._execute_query(check_query)
-            
-            if result:
-                logger.info(f"Table {table_name} already exists")
-                return True
-
-            create_query = schema_template.format(database=self.database, table_name=table_name)
-            self._execute_query(create_query)
-            logger.info(f"Successfully created table {table_name}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to create table {table_name}: {str(e)}")
-            return False
-
     async def get_experiment_config(self, experiment_id: str) -> Dict:
         """Get experiment configuration from database"""
         experiment = (
@@ -164,8 +114,7 @@ class DataService:
             experiment_id: ID of the experiment
             event_data: Event data to record
         """
-        safe_experiment_id = experiment_id.replace("-", "_")
-        table_name = f"{safe_experiment_id}_events"
+        table_name = "events"
         event_data["event_id"] = event_data.get("event_id", str(uuid.uuid4()))
         event_data["experiment_id"] = experiment_id
         event_data["timestamp"] = event_data.get("timestamp", datetime.utcnow())
@@ -183,8 +132,7 @@ class DataService:
             experiment_id: ID of the experiment
             metric_data: Metric data to record
         """
-        safe_experiment_id = experiment_id.replace("-", "_")
-        table_name = f"{safe_experiment_id}_metrics"
+        table_name = "metrics"
         metric_data["metric_id"] = metric_data.get("metric_id", str(uuid.uuid4()))
         metric_data["experiment_id"] = experiment_id
         metric_data["timestamp"] = metric_data.get("timestamp", datetime.utcnow())
@@ -206,8 +154,7 @@ class DataService:
             variant_id: ID of the variant
             context: Additional context data
         """
-        safe_experiment_id = experiment_id.replace("-", "_")
-        table_name = f"{safe_experiment_id}_assignments"
+        table_name = "assignments"
         assignment_data = {
             "assignment_id": str(uuid.uuid4()),
             "experiment_id": experiment_id,
@@ -230,8 +177,7 @@ class DataService:
             experiment_id: ID of the experiment
             results_data: Results data to record
         """
-        safe_experiment_id = experiment_id.replace("-", "_")
-        table_name = f"{safe_experiment_id}_results"
+        table_name = "results"
         results_data["result_id"] = results_data.get("result_id", str(uuid.uuid4()))
         results_data["experiment_id"] = experiment_id
         results_data["timestamp"] = results_data.get("timestamp", datetime.utcnow())
@@ -255,8 +201,7 @@ class DataService:
         Returns:
             List of event dictionaries
         """
-        safe_experiment_id = experiment_id.replace("-", "_")
-        table_name = f"{safe_experiment_id}_events"
+        table_name = "events"
         query = f"""
         SELECT *
         FROM {self.database}.{table_name}
@@ -284,8 +229,7 @@ class DataService:
         Returns:
             List of metric value dictionaries
         """
-        safe_experiment_id = experiment_id.replace("-", "_")
-        table_name = f"{safe_experiment_id}_metrics"
+        table_name = "metrics"
         query = f"""
         SELECT *
         FROM {self.database}.{table_name}
@@ -310,8 +254,7 @@ class DataService:
         Returns:
             List of exposure dictionaries
         """
-        safe_experiment_id = experiment_id.replace("-", "_")
-        table_name = f"{safe_experiment_id}_assignments"
+        table_name = "assignments"
         query = f"""
         SELECT variant_id, count() as count
         FROM {self.database}.{table_name}
@@ -335,8 +278,7 @@ class DataService:
         Returns:
             Dictionary mapping variant IDs to lists of metric values
         """
-        safe_experiment_id = experiment_id.replace("-", "_")
-        table_name = f"{safe_experiment_id}_metrics"
+        table_name = "metrics"
         query = f"""
         SELECT variant_id, metric_value
         FROM {self.database}.{table_name}
@@ -371,8 +313,7 @@ class DataService:
         Returns:
             Dictionary with experiment snapshot data
         """
-        safe_experiment_id = experiment_id.replace("-", "_")
-        assignments_table = f"{safe_experiment_id}_assignments"
+        assignments_table = "assignments"
         assignments_query = f"""
         SELECT variant_id, count() as count
         FROM {self.database}.{assignments_table}
@@ -388,8 +329,7 @@ class DataService:
         
         assignments = self._execute_query(assignments_query, assignments_params)
         
-        safe_experiment_id = experiment_id.replace("-", "_")
-        events_table = f"{safe_experiment_id}_events"
+        events_table = "events"
         events_query = f"""
         SELECT variant_id, event_type, count() as count
         FROM {self.database}.{events_table}

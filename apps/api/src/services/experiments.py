@@ -90,8 +90,8 @@ class ExperimentService:
         return await self.data_service.get_experiment_config(experiment_id)
 
     async def initialize_experiment(self, experiment_id: str, config: Dict) -> bool:
-        """Initialize a new experiment with required infrastructure
-
+        """Initialize a new experiment with the given configuration
+        
         Args:
             experiment_id: The unique identifier for the experiment
             config: The experiment configuration
@@ -99,9 +99,6 @@ class ExperimentService:
         Returns:
             bool: True if initialization was successful, False otherwise
         """
-        if not await self.data_service.initialize_experiment_tables(experiment_id):
-            return False
-        
         await self.data_service.set_experiment_config(experiment_id, config)
 
         if self.cache_service:
