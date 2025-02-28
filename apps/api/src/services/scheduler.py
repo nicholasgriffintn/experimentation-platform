@@ -115,8 +115,19 @@ class ExperimentScheduler:
     async def start_experiment(self, experiment: Experiment) -> None:
         """Initializes and starts an experiment, including ramp-up if configured"""
         try:
-            logger.info(f"Starting experiment {experiment.id}")
+            experiment_id = getattr(experiment, 'id', str(experiment))
+            logger.info(f"Starting experiment {experiment_id}")
             system_metrics.increment("scheduler", "start_experiment")
+
+            if isinstance(experiment, dict):
+                experiment_id = experiment.get('id')
+                if not experiment_id:
+                    raise ValueError("Experiment dictionary does not have an id")
+                
+                logger.warning(f"Experiment {experiment_id} is a dictionary, fetching from database")
+                experiment = self.db.query(Experiment).filter(Experiment.id == experiment_id).first()
+                if not experiment:
+                    raise ValueError(f"Could not find experiment with id {experiment_id}")
 
             config = {
                 "type": experiment.type,
@@ -172,6 +183,7 @@ class ExperimentScheduler:
     async def _apply_ramp_up_traffic(self, experiment: Experiment) -> None:
         """Apply initial traffic allocation for ramp-up"""
         try:
+            logger.info(f"Applying ramp-up traffic for experiment {experiment.id}")
             initial_traffic_percentage = settings.scheduler_ramp_up_initial_traffic
             setattr(experiment, "traffic_allocation", initial_traffic_percentage)
             setattr(experiment, "status", ExperimentStatus.RUNNING)
@@ -182,6 +194,7 @@ class ExperimentScheduler:
             hours_per_step = total_hours / steps
 
             for step in range(1, steps + 1):
+                logger.info(f"Scheduling ramp-up step {step} for experiment {experiment.id}")
                 task_key = f"{str(experiment.id)}_rampup_{step}"
                 self.scheduled_tasks[task_key] = asyncio.create_task(
                     self._schedule_traffic_increase(

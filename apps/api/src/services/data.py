@@ -121,16 +121,51 @@ class DataService:
 
     async def set_experiment_config(self, experiment_id: str, config: Dict) -> None:
         """Set experiment configuration in database"""
+        logger.info(f"Setting experiment config for {experiment_id}")
+        
         experiment = (
             self.metadata_db.query(DBExperiment).filter(DBExperiment.id == experiment_id).first()
         )
         if not experiment:
+            logger.error(f"Experiment {experiment_id} not found in database")
             return
 
-        for key, value in config.items():
-            setattr(experiment, key, value)
+        allowed_attributes = [
+            "type", "targeting_rules", "traffic_allocation", "status", 
+            "start_time", "end_time", "ramp_up_period", "auto_stop_conditions"
+        ]
+        
+        for key in allowed_attributes:
+            if key in config:
+                try:
+                    logger.debug(f"Setting {key} = {config[key]} on experiment {experiment_id}")
+                    setattr(experiment, key, config[key])
+                except Exception as e:
+                    logger.error(f"Error setting attribute {key} on experiment {experiment_id}: {str(e)}")
+        
+        if "analysis_config" in config:
+            analysis_config = config["analysis_config"]
+            if "correction_method" in analysis_config:
+                try:
+                    logger.debug(f"Setting correction_method = {analysis_config['correction_method']} on experiment {experiment_id}")
+                    setattr(experiment, "correction_method", analysis_config["correction_method"])
+                except Exception as e:
+                    logger.error(f"Error setting correction_method on experiment {experiment_id}: {str(e)}")
+            
+            if "alpha" in analysis_config:
+                try:
+                    logger.debug(f"Setting confidence_level = {analysis_config['alpha']} on experiment {experiment_id}")
+                    setattr(experiment, "confidence_level", analysis_config["alpha"])
+                except Exception as e:
+                    logger.error(f"Error setting confidence_level on experiment {experiment_id}: {str(e)}")
 
-        self.metadata_db.commit()
+        try:
+            self.metadata_db.commit()
+            logger.info(f"Successfully updated experiment {experiment_id} configuration")
+        except Exception as e:
+            self.metadata_db.rollback()
+            logger.error(f"Error committing experiment {experiment_id} configuration: {str(e)}")
+            raise
 
     async def record_event(self, experiment_id: str, event_data: Dict) -> None:
         """Record an experiment event in ClickHouse
